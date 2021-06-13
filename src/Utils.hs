@@ -1,0 +1,39 @@
+module Utils
+  ( headMaybe,
+    firstJust,
+    prettyprint,
+  )
+where
+
+import Data.Maybe
+  ( isJust,
+  )
+import Data.Strings
+  ( strNull,
+    strTrim,
+  )
+
+-- Returns the head of a list of maybes, or Nothing if empty
+headMaybe :: [Maybe a] -> Maybe a
+headMaybe [] = Nothing
+headMaybe (x : xs) = x
+
+-- Returns the first Maybe which is Just, else Nothing
+firstJust :: [Maybe a] -> Maybe a
+firstJust maybes = headMaybe (filter isJust maybes)
+
+-- Returns a nicer looking representation of a nested Haskell "show" result
+prettyprint :: String -> String
+prettyprint str = remEmptyLines $ fn str 0
+  where
+    fn (x : xs) n = case x of
+      ',' -> x : '\n' : indent n ++ fn xs n
+      '(' -> '\n' : indent (n + 2) ++ x : fn xs (n + 2)
+      ')' -> x : fn xs (n - 2)
+      '[' -> '\n' : indent (n + 2) ++ x : '\n' : indent (n + 4) ++ fn xs (n + 4)
+      ']' -> '\n' : indent (n - 2) ++ x : '\n' : indent (n - 4) ++ fn xs (n - 4)
+      _ -> x : fn xs n
+    fn [] _ = []
+    indent n = replicate n ' '
+    remEmptyLines = unlines . filter (not . isEmpty) . lines
+    isEmpty line = strNull (strTrim line)
