@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fc7d5b31bb367162559708a293019da9d9f2349f4f108ce6e965488b91c549db
+-- hash: 674272d43d8168773b880f8a23add5dae2646a88e6f0b3834dd3a359c28c898b
 
 name:           haskell-parser
-version:        0.1.0.0
+version:        0.1.0
 description:    Please see the README on GitHub at <https://github.com/mthaak/haskell-parser#readme>
 homepage:       https://github.com/mthaak/haskell-parser#readme
 bug-reports:    https://github.com/mthaak/haskell-parser/issues

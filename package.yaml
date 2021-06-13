@@ -1,5 +1,5 @@
 name: haskell-parser
-version: 0.1.0.0
+version: 0.1.0
 github: "mthaak/haskell-parser"
 license: BSD3
 author: "Martin ter Haak"

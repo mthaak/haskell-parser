@@ -7,7 +7,8 @@ import Common (Coordinates)
 import Data.Either (fromRight, isLeft, isRight, rights)
 import Data.List (find)
 import Data.Maybe (fromJust, isJust)
-import Debug.Trace (traceShow, traceShowId)
+import Debug.Trace (traceShowId)
+import Lexer (ScanItem (..))
 import Tokens
 
 adjustLayout :: [(Token, String)] -> [(Token, String)]
@@ -18,7 +19,7 @@ adjustLayout = map m . filter f
     m = replaceNewLine
     replaceNewLine (t, s) = if t == NewLine then (SemiColon, ";") else (t, s)
 
-convertLayout :: [(Token, String, Coordinates)] -> [(Token, String)]
+convertLayout :: [ScanItem Token] -> [ScanItem Token]
 convertLayout input = lexemes
   where
     tokensWithIndent = traceShowId $ addIndentIndicators input False
@@ -26,13 +27,14 @@ convertLayout input = lexemes
     tokensCleaned = traceShowId $ cleanLayout (fromRight [] tokensMappedWithL)
     lexemes = traceShowId $ filterLexemes tokensCleaned
 
-cleanLayout :: [Either IndentIndicator (Token, String)] -> [(Token, String)]
+-- Remove indent indicators
+cleanLayout :: [Either IndentIndicator (ScanItem Token)] -> [ScanItem Token]
 cleanLayout = rights
 
-filterLexemes :: [(Token, String)] -> [(Token, String)]
+filterLexemes :: [ScanItem Token] -> [ScanItem Token]
 filterLexemes = filter isLexeme
   where
-    isLexeme (t, _) = tokenIsLexeme t
+    isLexeme si = tokenIsLexeme (scanTok si)
 
 -- TODO merge into scanner, use ScanItem { scanLoc :: Location , scanStr :: String , scanItem :: a }
 
@@ -44,38 +46,37 @@ data IndentIndicator
 tokenIsLexeme :: Token -> Bool
 tokenIsLexeme tok = tok `notElem` [Space, NewLine, LineComment, EOF]
 
-addIndentIndicators :: [(Token, String, Coordinates)] -> Bool -> [Either IndentIndicator (Token, String)]
+addIndentIndicators :: [ScanItem Token] -> Bool -> [Either IndentIndicator (ScanItem Token)]
 -- If a let, where, do, or of keyword is not followed by the lexeme {,
 -- the token {n} is inserted after the keyword,
 -- where n is the indentation of the next lexeme if there is one,
 -- or 0 if the end of file has been reached.
-addIndentIndicators ((tok, str, _) : tokens) hasStart
-  | tok `elem` [Keyword Let, Keyword Where, Keyword Do, Keyword Of]
+addIndentIndicators (item : items) hasStart
+  | scanTok item `elem` [Keyword Let, Keyword Where, Keyword Do, Keyword Of]
       && nextLexemeExists
       && isNotLeftBrace nextLexeme =
     if isEOF nextLexeme
-      then Right (tok, str) : [Left (Start 1)]
-      else Right (tok, str) : Left (Start (getCol nextLexeme)) : addIndentIndicators tokens True
+      then Right item : [Left (Start 1)]
+      else Right item : Left (Start (getCol nextLexeme)) : addIndentIndicators items True
   where
-    maybeNextLexeme = find (\(t, _, _) -> tokenIsLexeme t) tokens
+    maybeNextLexeme = find (tokenIsLexeme . scanTok) items
     nextLexemeExists = isJust maybeNextLexeme
     nextLexeme = fromJust maybeNextLexeme
-    isNotLeftBrace (t, _, _) = t /= LeftBrace
-    isEOF (t, _, _) = t == EOF
-    getCol (_, _, (_, col)) = col
+    isNotLeftBrace si = scanTok si /= LeftBrace
+    isEOF si = scanTok si == EOF
+    getCol si = snd (scanLoc si)
 -- Where the start of a lexeme is preceded only by white space on the same line,
 -- this lexeme is preceded by < n > where n is the indentation of the lexeme,
 -- provided that it is not, as a consequence of the first two rules, preceded by {n}
-addIndentIndicators ((tok, str, (r, c)) : tokens) False
+addIndentIndicators ((ScanItem (r, c) str tok) : items) False
   | startsNewLine && nextLexemeExists && nextLexemeRow == r + 1 =
-    Right (tok, str) : Left (Indent nextLexemeColumn) : addIndentIndicators tokens False
+    Right (ScanItem (r, c) str tok) : Left (Indent nextLexemeColumn) : addIndentIndicators items False
   where
     startsNewLine = tok == NewLine || tok == LineComment
-    maybeNextLexeme = find (\(t, _, _) -> tokenIsLexeme t) tokens
+    maybeNextLexeme = find (tokenIsLexeme . scanTok) items
     nextLexemeExists = isJust maybeNextLexeme
-    (nextLexemeRow, nextLexemeColumn) = getCoord (fromJust maybeNextLexeme)
-    getCoord (_, _, coord) = coord
-addIndentIndicators ((t, s, _) : tokens) hasStart = Right (t, s) : addIndentIndicators tokens keepStart
+    (nextLexemeRow, nextLexemeColumn) = scanLoc (fromJust maybeNextLexeme)
+addIndentIndicators ((ScanItem c s t) : items) hasStart = Right (ScanItem c s t) : addIndentIndicators items keepStart
   where
     keepStart = hasStart && (t == Space || t == NewLine || t == LineComment)
 addIndentIndicators [] _ = []
@@ -91,32 +92,36 @@ data LayoutError = LayoutError deriving (Eq, Show)
 (>:) b (Right bs) = Right (b : bs)
 (>:) _ (Left bs) = Left bs
 
-funL :: [Either IndentIndicator (Token, String)] -> [Int] -> Either LayoutError [Either IndentIndicator (Token, String)]
+-- Special coordinates for inserted tokens
+x :: Coordinates
+x = (0, 0)
+
+funL :: [Either IndentIndicator (ScanItem Token)] -> [Int] -> Either LayoutError [Either IndentIndicator (ScanItem Token)]
 -- L (< n >: ts) (m : ms) if m = n = ; : (L ts (m : ms))
-funL (Left (Indent n) : ts) (m : ms) | m == n = Right (SemiColon, ";") >: funL ts (m : ms)
+funL (Left (Indent n) : ts) (m : ms) | m == n = Right (ScanItem x ";" SemiColon) >: funL ts (m : ms)
 -- L (< n >: ts) (m : ms) if n < m = } : (L (< n >: ts) ms)
-funL (Left (Indent n) : ts) (m : ms) | n < m = Right (RightBrace, "}") >: funL (Left (Indent n) : ts) ms
+funL (Left (Indent n) : ts) (m : ms) | n < m = Right (ScanItem x "}" RightBrace) >: funL (Left (Indent n) : ts) ms
 -- L (< n >: ts) ms = L ts ms
 funL (Left (Indent n) : ts) ms = funL ts ms
 -- L ({n} : ts) (m : ms) if n > m = { : (L ts (n : m : ms))
-funL (Left (Start n) : ts) (m : ms) | n > m = Right (LeftBrace, "{") >: funL ts (n : m : ms)
+funL (Left (Start n) : ts) (m : ms) | n > m = Right (ScanItem x "{" LeftBrace) >: funL ts (n : m : ms)
 -- L ({n} : ts) [] if n > 0 = { : (L ts [n])
-funL (Left (Start n) : ts) [] | n > 0 = Right (LeftBrace, "{") >: funL ts [n]
+funL (Left (Start n) : ts) [] | n > 0 = Right (ScanItem x "{" LeftBrace) >: funL ts [n]
 -- L ({n} : ts) ms = { : } : (L (< n >: ts) ms)
-funL (Left (Start n) : ts) ms = Right (LeftBrace, "{") >: (Right (RightBrace, "}") >: funL (Left (Indent n) : ts) ms)
+funL (Left (Start n) : ts) ms = Right (ScanItem x "{" LeftBrace) >: (Right (ScanItem x "}" RightBrace) >: funL (Left (Indent n) : ts) ms)
 -- L (} : ts) (0 : ms) = } : (L ts ms)
-funL (Right (RightBrace, "}") : ts) (0 : ms) = Right (RightBrace, "}") >: funL ts ms
+funL (Right (ScanItem _ _ RightBrace) : ts) (0 : ms) = Right (ScanItem x "}" RightBrace) >: funL ts ms
 -- L (} : ts) ms = parse-error
-funL (Right (RightBrace, "}") : ts) ms = Left LayoutError
+funL (Right (ScanItem _ _ RightBrace) : ts) ms = Left LayoutError
 -- L ({ : ts) ms = { : (L ts (0 : ms))
-funL (Right (LeftBrace, "{") : ts) ms = Right (LeftBrace, "{") >: funL ts (0 : ms)
+funL (Right (ScanItem _ _ LeftBrace) : ts) ms = Right (ScanItem x "{" LeftBrace) >: funL ts (0 : ms)
 -- L (t : ts) (m : ms) if m ∕= 0 and parse-error(t) = } : (L (t : ts) ms)
-funL (t : ts) (m : ms) | m /= 0 && parseError = Right (RightBrace, "}") >: funL (t : ts) ms
+funL (t : ts) (m : ms) | m /= 0 && parseError = Right (ScanItem x "}" RightBrace) >: funL (t : ts) ms
   where
-    parseError = isLeft (funL (t : ts) ms) && isRight (funL (Right (RightBrace, "}") : t : ts) ms)
+    parseError = isLeft (funL (t : ts) ms) && isRight (funL (Right (ScanItem x "}" RightBrace) : t : ts) ms)
 -- L (t : ts) ms = t : (L ts ms)
 funL (Right t : ts) ms = Right t >: funL ts ms
 -- L [] [] = []
 funL [] [] = Right []
 -- L [] (m : ms) = } : L [] ms
-funL [] (m : ms) = Right (RightBrace, "}") >: funL [] ms
+funL [] (m : ms) = Right (ScanItem x "}" RightBrace) >: funL [] ms

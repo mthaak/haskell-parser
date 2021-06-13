@@ -2,6 +2,7 @@
 
 module Lexer
   ( lexer,
+    ScanItem (..),
   )
 where
 
@@ -18,35 +19,67 @@ import Data.Maybe
     isJust,
     listToMaybe,
   )
-import Data.Strings
-  ( strNull,
-    strStartsWith,
-    strTrim,
-  )
 import Tokens
 
--- Turns the input into a stream of tokens
-lexer :: String -> [(Token, String, Coordinates)]
-lexer input = scan [] input (1, 1)
-  where
-    scan :: [(Token, String, Coordinates)] -> String -> Coordinates -> [(Token, String, Coordinates)]
-    scan prevTokens remInput (r, c) =
-      if tok == EOF
-        then currTokens
-        else scan currTokens nextInput nextCoordinates
-      where
-        (tok, str) = getNextToken remInput
-        currTokens = prevTokens ++ [(tok, str, (r, c))]
-        nextInput = drop (length str) remInput
-        nextCoordinates =
-          if tok == NewLine || tok == LineComment
-            then (r + 1, 1)
-            else (r, c + length str)
+{- Wrap scanned tokens in ScanItem to add information about context -}
+data ScanItem a = ScanItem
+  { scanLoc :: Coordinates,
+    scanStr :: String,
+    scanTok :: a
+  }
+  deriving (Eq)
 
-removeEmptyLines :: String -> String
-removeEmptyLines = unlines . filter (not . isEmpty) . lines
+instance Functor ScanItem where
+  fmap fab sia =
+    ScanItem
+      { scanLoc = scanLoc sia,
+        scanStr = scanStr sia,
+        scanTok = fab $ scanTok sia
+      }
+
+instance Applicative ScanItem where
+  pure a = ScanItem (1, 1) "" a
+  siab <*> sia =
+    ScanItem
+      { scanLoc = scanLoc siab,
+        scanStr = scanStr siab ++ scanStr sia,
+        scanTok = scanTok siab $ scanTok sia
+      }
+
+instance Show a => Show (ScanItem a) where
+  show (ScanItem coo str tok) =
+    mconcat
+      [ "{ ",
+        show coo,
+        " ",
+        show str,
+        " ",
+        show tok,
+        " }"
+      ]
+
+{- The scanner takes as an input a tuple of current scan location
+   & the part of the string not yet scanned -}
+type Input = (Coordinates, String)
+
+-- Turns the input into a stream of scanned tokens
+lexer :: String -> [ScanItem Token]
+lexer input = scan [] ((1, 1), input)
+
+-- Recursive scan until whole input has been consumed
+scan :: [ScanItem Token] -> Input -> [ScanItem Token]
+scan prevTokens ((r, c), remInput) =
+  if tok == EOF
+    then currTokens
+    else scan currTokens (nextCoords, nextInput)
   where
-    isEmpty line = strNull (strTrim line)
+    (tok, str) = getNextToken remInput
+    currTokens = prevTokens ++ [ScanItem (r, c) str tok]
+    nextInput = drop (length str) remInput
+    nextCoords =
+      if tok == NewLine || tok == LineComment
+        then (r + 1, 1)
+        else (r, c + length str)
 
 -- Matcher state
 data State

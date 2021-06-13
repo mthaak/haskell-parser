@@ -19,12 +19,14 @@ module Parser
   )
 where
 
+import Common (Coordinates)
 import Control.Applicative
 import Control.Monad
-import Data.Functor (($>))
 import Data.List ((\\))
 import Debug.Trace (traceM)
 import Elements
+import Lexer (ScanItem (..))
+import Text.Printf (printf)
 import Tokens (KeywordToken (..), Token (..))
 
 parseTokens :: Input -> Either ParseError Module
@@ -36,7 +38,7 @@ parseTokens input = do
 parseRecursive :: Input -> Either ParseError (Module, Input)
 parseRecursive = runParser parseModule
 
-type Input = [(Tokens.Token, String)]
+type Input = [ScanItem Token]
 
 newtype Parser a = Parser {runParser :: Input -> Either ParseError (a, Input)}
 
@@ -66,24 +68,37 @@ instance Monad Parser where
   (>>=) = bind
 
 failure :: Parser a
-failure = Parser $ \s -> Left ParseError
+failure = Parser $ \s -> Left $ ParseError (71, 0) "Failure"
 
+-- Run first parser. If fail, run second parser
 option :: Parser a -> Parser a -> Parser a
-option p q = Parser $ \s ->
-  case runParser p s of
-    Left ParseError -> runParser q s
-    res -> res
+option pa1 pa2 = Parser $ \s ->
+  case runParser pa1 s of
+    res@(Right _) -> res
+    Left err1 ->
+      case runParser pa2 s of
+        res@(Right _) -> res
+        Left err2 ->
+          if errorLoc err1 >= errorLoc err2
+            then Left err1
+            else Left err2
 
 instance Alternative Parser where
   empty = failure
   (<|>) = option
 
-data ParseError = ParseError deriving (Eq, Show)
+data ParseError = ParseError Coordinates String deriving (Eq, Show)
+
+errorLoc :: ParseError -> Coordinates
+errorLoc (ParseError c _) = c
+
+errorMsg :: ParseError -> String
+errorMsg (ParseError _ s) = s
 
 -- PARSERS HELPERS
 
 fail :: p -> Either ParseError b
-fail _ = Left ParseError
+fail _ = Left $ ParseError (0, 0) "Fail"
 
 parseFail :: Parser a
 parseFail = Parser Parser.fail
@@ -94,21 +109,19 @@ parseNothing = Parser $ \s -> Right (Nothing, s)
 parseNop :: Parser Nop
 parseNop = Parser $ \s -> Right (Nop, s)
 
-parseToken :: Token -> Parser Token
-parseToken eqToken = Parser fn
+parseItem :: Token -> Parser (ScanItem Token)
+parseItem expTok = Parser fn
   where
-    fn ((tok, word) : xs)
-      | tok == eqToken = Right (tok, xs)
-      | otherwise = Left ParseError
-    fn [] = Left ParseError
+    fn (si : xs)
+      | scanTok si == expTok = Right (si, xs)
+      | otherwise = Left $ ParseError (0, 0) (printf "Could not parse item %s as expected token %s" (show si) (show expTok))
+    fn [] = Left $ ParseError (0, 0) "Could not find next scan item"
+
+parseToken :: Token -> Parser Token
+parseToken expTok = scanTok <$> parseItem expTok
 
 parseTokenAsString :: Token -> Parser String
-parseTokenAsString eqToken = Parser fn
-  where
-    fn ((tok, word) : xs)
-      | tok == eqToken = Right (word, xs)
-      | otherwise = Left ParseError
-    fn [] = Left ParseError
+parseTokenAsString expTok = scanStr <$> parseItem expTok
 
 parseKeyword :: KeywordToken -> Parser KeywordToken
 parseKeyword keyword = parser >>= toKWParser
@@ -133,7 +146,7 @@ zeroOrMore pa = Parser $ \s -> fn s []
   where
     fn (x : xs) matches =
       case nextResult of
-        Left ParseError -> Right (matches, x : xs)
+        Left (ParseError _ _) -> Right (matches, x : xs)
         Right (match, remaining) -> fn remaining (matches ++ [match])
       where
         nextResult = runParser pa (x : xs)
@@ -228,8 +241,8 @@ parseLiteral =
 getNext :: Parser Token
 getNext = Parser fn
   where
-    fn ((tok, _) : xs) = Right (tok, xs)
-    fn [] = Left ParseError
+    fn (ScanItem {scanTok = tok} : xs) = Right (tok, xs)
+    fn [] = Left $ ParseError (0, 0) "Could not get next"
 
 parseSymbol :: Parser Symbol
 parseSymbol = parseAscSymbol

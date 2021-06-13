@@ -1,7 +1,7 @@
 module Main where
 
 import Layout (convertLayout)
-import Lexer (lexer)
+import Lexer (ScanItem (..), lexer)
 import Parser (parseTokens)
 import System.Environment
 import System.Exit
@@ -25,21 +25,21 @@ run input = do
 
   putStrLn ""
 
-  -- Scan tokens
-  let tokens = lexer input
+  -- Run lexical analysis
+  let scanItems = lexer input
   putStrLn . printf "Number of non identified characters: %d" $
-    length (filter (\(tok, _, _) -> tok == Other) tokens)
+    length (filter (\st -> scanTok st == Other) scanItems)
 
   putStrLn ""
 
   -- Make layout-insensitive
-  let tokens' = convertLayout tokens
+  let scanItems' = convertLayout scanItems
   putStrLn "Layout-insensitive lexical analysis:"
-  print tokens'
+  print scanItems'
 
   putStrLn ""
 
-  -- Parse
-  let parsed = parseTokens tokens'
+  -- Run parser
+  let parsed = parseTokens scanItems'
   putStrLn "Parse result:"
-  putStrLn . prettyprint . either (const "Error") show $ parsed
+  putStrLn . either show (prettyprint . show) $ parsed
