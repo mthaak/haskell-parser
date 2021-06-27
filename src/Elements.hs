@@ -47,7 +47,8 @@ type TyCon = ConId
 type TyCls = ConId
 
 -- Module ID
-type ModId = ConId
+data ModId = ModId String
+  deriving (Eq, Show)
 
 -- TODO qualified elements
 
@@ -73,7 +74,8 @@ type QVarSym = VarSym
 
 -- Qualified constructor symbol
 -- TODO qconsym	→	[ modid . ] consym
-type QConSym = ConSym
+data QConSym = QConSym String
+  deriving (Eq, Show)
 
 -- Integer literal
 data LitInteger = LitInteger String
@@ -96,8 +98,10 @@ data LitString = LitString String
 data Module = Module ModId (Maybe [Export]) Body
   deriving (Eq, Show)
 
-data Body = Body TopDecls
+data Body = Body ImpDecls TopDecls
   deriving (Eq, Show)
+
+type ImpDecls = [ImpDecl]
 
 type Exports = [Export]
 
@@ -106,6 +110,22 @@ data Export
   | Export_QTyCon QTyCon (Either All [CName])
   | Export_QTyCls QTyCls (Either All [QVar])
   | Export_Module ModId
+  deriving (Eq, Show)
+
+type Qualified = Bool
+
+data ImpDecl = ImpDecl Qualified ModId (Maybe ModId) (Maybe ImpSpec)
+  deriving (Eq, Show)
+
+data ImpSpec
+  = ImpSpec [Import]
+  | ImpSpec_Hiding [Import]
+  deriving (Eq, Show)
+
+data Import
+  = Import_Var Var
+  | Import_TyCon (Either All [CName])
+  | Import_TyCls (Either All [Var])
   deriving (Eq, Show)
 
 type CName = Either Var Con
@@ -127,20 +147,23 @@ type Decls = [Decl]
 
 data Decl
   = Decl_GenDecl GenDecl
-  | Decl_FunLhs (Either FunLhs Pat) Rhs
+  | Decl_FunLhs FunLhs Rhs
+  | Decl_Pat Pat Rhs
   deriving (Eq, Show)
 
 type CDecls = [CDecl]
 
 data CDecl
   = CDecl_GenDecl GenDecl
-  | CDecl_FunLhs (Either FunLhs Var) Rhs
+  | CDecl_FunLhs FunLhs Rhs
+  | CDecl_Var Var Rhs
   deriving (Eq, Show)
 
 type IDecls = [IDecl]
 
 data IDecl
-  = IDecl_FunLhs (Either FunLhs Var) Rhs
+  = IDecl_FunLhs FunLhs Rhs
+  | IDecl_Var Var Rhs
   deriving (Eq, Show)
 
 data GenDecl
@@ -227,11 +250,22 @@ data Inst
   deriving (Eq, Show)
 
 -- Function left hand side
-data FunLhs = FunLhs_Var Var [APat] -- TODO
+data FunLhs
+  = FunLhs_Var Var [APat]
+  | FunLhs_Pat Pat VarOp Pat
+  | FunLhs_Fun FunLhs [APat]
   deriving (Eq, Show)
 
 -- Right hand side
 data Rhs = Rhs_Exp Exp (Maybe Decls)
+  deriving (Eq, Show)
+
+type Guards = [Guard]
+
+data Guard
+  = Guard_Pat Pat InfixExp
+  | Guard_Decls Decls
+  | Guard_Infix InfixExp
   deriving (Eq, Show)
 
 -- Expression
@@ -246,8 +280,13 @@ data InfixExp -- TODO
   | InfixExp_LExp LExp
   deriving (Eq, Show)
 
-data LExp -- TODO
-  = LExp_FExp FExp
+data LExp
+  = LExp_Lambda [APat] Exp
+  | LExp_Let Decls Exp
+  | LExp_IfElse Exp Exp Exp
+  | LExp_Case Exp Alts
+  | LExp_Do Stmts
+  | LExp_FExp FExp
   deriving (Eq, Show)
 
 -- Function application
@@ -271,69 +310,59 @@ data AExp -- TODO
   --  | AExp_LabelUpd AExp [FBind] -- TODO
   deriving (Eq, Show)
 
---  qual	→	pat <- exp	    (generator)
---  |	let decls	    (local declaration)
---  |	exp	    (guard)
---
---  alts	→	alt1 ; … ; altn	    (n ≥ 1)
---  alt	→	pat -> exp [where decls]
---  |	pat gdpat [where decls]
---  |		    (empty alternative)
---
---  gdpat	→	guards -> exp [ gdpat ]
---
---  stmts	→	stmt1 … stmtn exp [;]	    (n ≥ 0)
---  stmt	→	exp ;
---  |	pat <- exp ;
---  |	let decls ;
---  |	;	    (empty statement)
---
---  fbind	→	qvar = exp
+type Alts = [Alt]
+
+data Alt
+  = Alt_Exp Pat Exp (Maybe Decls)
+  | Alt_GdPat Pat GdPat (Maybe Decls)
+  | Alt_Empty
+  deriving (Eq, Show)
+
+data GdPat = GdPat Guards Exp (Maybe GdPat)
+  deriving (Eq, Show)
+
+data Stmts = Stmts [Stmt] Exp
+  deriving (Eq, Show)
+
+data Stmt
+  = Stmt_Exp Exp
+  | Stmt_Pat Pat Exp
+  | Stmt_Decls Decls
+  | Stmt_Empty
+  deriving (Eq, Show)
+
 data FBind = FBind QVar Exp
   deriving (Eq, Show)
 
---  pat	→	lpat qconop pat	    (infix constructor)
---  |	lpat
-
 data Pat
-  = Pat_LPat LPat -- TODO
+  = Pat_Infix LPat QConOp Pat
+  | Pat_LPat LPat
   deriving (Eq, Show)
-
---  lpat	→	apat
---  |	- (integer | float)	    (negative literal)
---  |	gcon apat1 … apatk	    (arity gcon  =  k, k ≥ 1)
 
 data LPat
   = LPat_APat APat -- TODO
   deriving (Eq, Show)
 
---  apat	→	var [ @ apat]	    (as pattern)
---  |	gcon	    (arity gcon  =  0)
---  |	qcon { fpat1 , … , fpatk }	    (labeled pattern, k ≥ 0)
---  |	literal
---  |	_	    (wildcard)
---  |	( pat )	    (parenthesized pattern)
---  |	( pat1 , … , patk )	    (tuple pattern, k ≥ 2)
---  |	[ pat1 , … , patk ]	    (list pattern, k ≥ 1)
---  |	~ apat	    (irrefutable pattern)
-data APat -- TODO
+data APat
   = APat_Var Var (Maybe APat)
   | APat_GCon GCon
   | APat_QCon QCon [FPat]
   | APat_Lit Literal
+  | APat_Wildcard
+  | APat_Paran Pat
+  | APat_Tuple [Pat]
+  | APat_List [Pat]
+  | APat_Irrefut APat
   deriving (Eq, Show)
 
---  fpat	→	qvar = pat
 data FPat
   = FPat QVar Pat
   deriving (Eq, Show)
 
---  gcon	→	  ()
---        |	  []
---        |	  (,{,})
---        |	  qcon
 data GCon
-  = GCon_Nop
+  = GCon_Unit
+  | GCon_List
+  | GCon_Tuple
   | GCon_QCon QCon
   deriving (Eq, Show)
 
@@ -366,7 +395,9 @@ data ConOp = ConOp ConSym -- TODO
   deriving (Eq, Show)
 
 -- Qualified constructor operator
-data QConOp = QConOp QConSym -- TODO
+data QConOp
+  = QConOp_GConSym GConSym
+  | QConOp_QConId QConId
   deriving (Eq, Show)
 
 -- Operator
@@ -379,6 +410,11 @@ data Op
 data QOp
   = QOp_QVarOp QVarOp
   | QOp_QConOp QConOp
+  deriving (Eq, Show)
+
+data GConSym
+  = GConSym_Colon
+  | GConSym_QConSym QConSym
   deriving (Eq, Show)
 
 data Nop = Nop

@@ -3,6 +3,7 @@
 module Lexer
   ( lexer,
     ScanItem (..),
+    si,
   )
 where
 
@@ -29,6 +30,9 @@ data ScanItem a = ScanItem
   }
   deriving (Eq)
 
+si :: Common.Coordinates -> String -> a -> ScanItem a
+si = ScanItem
+
 instance Functor ScanItem where
   fmap fab sia =
     ScanItem
@@ -49,13 +53,12 @@ instance Applicative ScanItem where
 instance Show a => Show (ScanItem a) where
   show (ScanItem coo str tok) =
     mconcat
-      [ "{ ",
+      [ "ScanItem ",
         show coo,
         " ",
         show str,
         " ",
-        show tok,
-        " }"
+        show tok
       ]
 
 {- The scanner takes as an input a tuple of current scan location
@@ -178,20 +181,33 @@ keywordMatchers = map (uncurry fn) keywords
   where
     fn word keywordToken = generateMatcher word (Keyword keywordToken)
     keywords =
-      [ ("where", Tokens.Where),
-        ("module", Tokens.Module),
-        ("data", Tokens.Data),
-        ("deriving", Tokens.Deriving),
-        ("instance", Tokens.Instance),
-        ("type", Tokens.Type),
-        ("newtype", Tokens.NewType),
+      [ -- reservedid:
+        ("case", Tokens.Case),
         ("class", Tokens.Class),
+        ("data", Tokens.Data),
         ("default", Tokens.Default),
-        ("let", Tokens.Let),
-        ("in", Tokens.In),
-        ("of", Tokens.Of),
+        ("deriving", Tokens.Deriving),
         ("do", Tokens.Do),
-        ("deriving", Tokens.Deriving)
+        ("else", Tokens.Else),
+        ("foreign", Tokens.Foreign),
+        ("if", Tokens.If),
+        ("in", Tokens.In),
+        ("infix", Tokens.Infix),
+        ("infixl", Tokens.Infixl),
+        ("infixr", Tokens.Infixr),
+        ("instance", Tokens.Instance),
+        ("let", Tokens.Let),
+        ("module", Tokens.Module),
+        ("newtype", Tokens.NewType),
+        ("import", Tokens.Import),
+        ("of", Tokens.Of),
+        ("then", Tokens.Then),
+        ("type", Tokens.Type),
+        ("where", Tokens.Where),
+        -- Not in Lexical Syntax
+        ("as", Tokens.As),
+        ("hiding", Tokens.Hiding),
+        ("qualified", Tokens.Qualified)
       ]
 
 allMatchers :: [Matcher]
@@ -211,6 +227,7 @@ allMatchers =
     ++ [ generateMatcher "=" Equals,
          generateMatcher "->" SingleArrow,
          generateMatcher "=>" DoubleArrow,
+         generateMatcher "<-" LeftArrow,
          generateMatcher ":" Colon,
          generateMatcher "::" DoubleColon,
          generateMatcher ".." DoubleDot,
@@ -243,7 +260,8 @@ allMatchers =
          generateMatcher "[" LeftBracket,
          generateMatcher "]" RightBracket,
          generateMatcher "{" LeftBrace,
-         generateMatcher "}" RightBrace
+         generateMatcher "}" RightBrace,
+         generateMatcher "_" Underscore
        ]
     ++ [matchOther] -- has to be last matcher, because it matches on everything
 

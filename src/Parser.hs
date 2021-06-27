@@ -1,11 +1,13 @@
 {-# LANGUAGE BlockArguments #-}
 
 module Parser
-  ( parseTokens,
+  ( parse,
     runParser,
     ParseError,
     Parser,
     Input,
+    parseConSym,
+    parseDecls,
     parseDecl,
     parseFunLhs,
     parseRhs,
@@ -16,21 +18,24 @@ module Parser
     parseConstrs,
     parseConstr,
     parseDeriving,
+    parsePat,
+    parseAPat,
   )
 where
 
 import Common (Coordinates)
 import Control.Applicative
 import Control.Monad
-import Data.List ((\\))
+import Data.List (intercalate, (\\))
+import Data.Maybe (fromMaybe, isJust)
 import Debug.Trace (traceM)
 import Elements
 import Lexer (ScanItem (..))
 import Text.Printf (printf)
 import Tokens (KeywordToken (..), Token (..))
 
-parseTokens :: Input -> Either ParseError Module
-parseTokens input = do
+parse :: Input -> Either ParseError Module
+parse input = do
   (elem_, rem_) <- parseRecursive input
   traceM ("remainder: " ++ show rem_)
   pure elem_
@@ -123,6 +128,9 @@ parseToken expTok = scanTok <$> parseItem expTok
 parseTokenAsString :: Token -> Parser String
 parseTokenAsString expTok = scanStr <$> parseItem expTok
 
+parseTokens :: [Token] -> Parser [Token]
+parseTokens = mapM parseToken
+
 parseKeyword :: KeywordToken -> Parser KeywordToken
 parseKeyword keyword = parser >>= toKWParser
   where
@@ -182,6 +190,15 @@ tupled pa = do
   parseToken Tokens.RightParan
   pure elems
 
+-- Allows extra comma at the end
+tupled' :: Parser a -> Parser [a]
+tupled' pa = do
+  parseToken Tokens.LeftParan
+  elems <- oneOrMoreSep Tokens.Comma pa
+  optional $ parseToken Tokens.Comma
+  parseToken Tokens.RightParan
+  pure elems
+
 listed :: Parser a -> Parser [a]
 listed pa = do
   parseToken Tokens.LeftBracket
@@ -218,11 +235,17 @@ precedes t pa = do
   pa
 
 between :: Parser a -> Token -> Token -> Parser a
-between pa b c = do
-  parseToken b
-  result <- pa
-  parseToken c
-  return result
+between pa l r = do
+  parseToken l
+  a <- pa
+  parseToken r
+  return a
+
+trailingSemicolon :: Parser a -> Parser a
+trailingSemicolon pa = do
+  a <- pa
+  optional (parseToken SemiColon)
+  return a
 
 parseAll :: Parser All
 parseAll = do
@@ -308,7 +331,11 @@ parseTyCls :: Parser TyCls
 parseTyCls = parseConId
 
 parseModId :: Parser ModId
-parseModId = parseConId
+parseModId = do
+  conIds <- oneOrMoreSep Dot parseConId
+  let strings = map (\(ConId str) -> str) conIds
+  let modId = intercalate "." strings
+  pure $ ModId modId
 
 parseQVarId :: Parser QVarId
 parseQVarId = parseVarId
@@ -326,7 +353,11 @@ parseQVarSym :: Parser QVarSym
 parseQVarSym = parseVarSym
 
 parseQConSym :: Parser QConSym
-parseQConSym = parseConSym
+parseQConSym = do
+  maybeModId <- optional parseModId `followedBy` Dot
+  let modIdStr = fromMaybe "" (fmap (\(ModId str) -> str ++ ".") maybeModId)
+  (ConSym conSymStr) <- parseConSym
+  pure $ QConSym (modIdStr ++ conSymStr)
 
 parseLitInteger :: Parser LitInteger
 parseLitInteger = LitInteger <$> parseTokenAsString Tokens.IntegerLiteral
@@ -355,9 +386,14 @@ parseModule = do
 parseBody :: Parser Body
 parseBody = do
   parseToken LeftBrace
+  impDecls <- parseImpDecls
+  optional (parseToken SemiColon)
   topDecls <- parseTopDecls
   parseToken RightBrace
-  return (Body topDecls)
+  return $ Body impDecls topDecls
+
+parseImpDecls :: Parser ImpDecls
+parseImpDecls = zeroOrMoreSep SemiColon parseImpDecl
 
 parseExports :: Parser Exports
 parseExports = do
@@ -374,10 +410,30 @@ parseExport =
     <|> Export_QTyCls <$> parseQTyCls <*> Parser.either parseAll (tupled parseQVar)
     <|> Export_Module <$> parseModId
 
+parseImpDecl :: Parser ImpDecl
+parseImpDecl = do
+  parseKeyword Tokens.Import
+  qualified <- isJust <$> optional (parseKeyword Qualified)
+  modId <- parseModId
+  modIdAs <- optional $ parseModId `precededBy` Keyword As
+  impSpec <- optional $ parseImpSpec
+  pure $ ImpDecl qualified modId modIdAs impSpec
+
+parseImpSpec :: Parser ImpSpec
+parseImpSpec =
+  ImpSpec <$> tupled' parseImport
+    <|> ImpSpec_Hiding <$> tupled' parseImport `precededBy` Keyword Hiding
+
+parseImport :: Parser Import
+parseImport =
+  Import_Var <$> parseVar
+    <|> Import_TyCon <$> Parser.either parseAll (tupled parseCName)
+    <|> Import_TyCls <$> Parser.either parseAll (tupled parseVar)
+
 parseCName :: Parser CName
 parseCName = Parser.either parseVar parseCon
 
-parseTopDecls :: Parser [TopDecl]
+parseTopDecls :: Parser TopDecls
 parseTopDecls = zeroOrMoreSep Tokens.SemiColon parseTopDecl
 
 parseTopDecl :: Parser TopDecl
@@ -397,7 +453,8 @@ parseDecls = betweenBraces (zeroOrMoreSep Tokens.SemiColon parseDecl)
 parseDecl :: Parser Decl
 parseDecl =
   Decl_GenDecl <$> parseGenDecl
-    <|> Decl_FunLhs <$> Parser.either parseFunLhs parsePat <*> parseRhs
+    <|> Decl_FunLhs <$> parseFunLhs <*> parseRhs
+    <|> Decl_Pat <$> parsePat <*> parseRhs
 
 parseCDecls :: Parser CDecls
 parseCDecls = betweenBraces (zeroOrMoreSep Tokens.SemiColon parseCDecl)
@@ -405,13 +462,16 @@ parseCDecls = betweenBraces (zeroOrMoreSep Tokens.SemiColon parseCDecl)
 parseCDecl :: Parser CDecl
 parseCDecl =
   CDecl_GenDecl <$> parseGenDecl
-    <|> CDecl_FunLhs <$> Parser.either parseFunLhs parseVar <*> parseRhs
+    <|> CDecl_FunLhs <$> parseFunLhs <*> parseRhs
+    <|> CDecl_Var <$> parseVar <*> parseRhs
 
 parseIDecls :: Parser IDecls
 parseIDecls = betweenBraces (zeroOrMoreSep Tokens.SemiColon parseIDecl)
 
 parseIDecl :: Parser IDecl
-parseIDecl = IDecl_FunLhs <$> Parser.either parseFunLhs parseVar <*> parseRhs
+parseIDecl =
+  IDecl_FunLhs <$> parseFunLhs <*> parseRhs
+    <|> IDecl_Var <$> parseVar <*> parseRhs
 
 parseGenDecl :: Parser GenDecl
 parseGenDecl = do
@@ -446,7 +506,12 @@ parseAType =
     <|> AType_ParanCon <$> between parseType Tokens.LeftParan Tokens.RightParan
 
 parseGTyCon :: Parser GTyCon
-parseGTyCon = GTyCon_QTyCon <$> parseQTyCon -- TODO add more
+parseGTyCon =
+  GTyCon_QTyCon <$> parseQTyCon
+    <|> GTyCon_Unit <$ parseTokens [LeftParan, RightParan]
+    <|> GTyCon_ListCon <$ parseTokens [LeftBracket, RightBracket]
+    <|> GTyCon_FunCon <$ betweenParans (parseToken SingleArrow)
+    <|> GTyCon_TupleCon <$ betweenParans (zeroOrMore (parseToken Comma))
 
 parseContext :: Parser Context
 parseContext =
@@ -529,10 +594,10 @@ parseInst =
         )
 
 parseFunLhs :: Parser FunLhs
-parseFunLhs = do
-  var <- parseVar
-  aPats <- oneOrMore parseAPat
-  return $ FunLhs_Var var aPats
+parseFunLhs =
+  FunLhs_Var <$> parseVar <*> oneOrMore parseAPat
+    <|> FunLhs_Pat <$> parsePat <*> parseVarOp <*> parsePat
+    <|> FunLhs_Fun <$> betweenParans parseFunLhs <*> oneOrMore parseAPat
 
 parseRhs :: Parser Rhs
 parseRhs = do
@@ -540,6 +605,20 @@ parseRhs = do
   exp <- parseExp
   maybeWhere <- optional (parseDecls `precededBy` Keyword Where)
   return $ Rhs_Exp exp maybeWhere
+
+-- TODO gdrhs
+
+parseGuards :: Parser Guards
+parseGuards = do
+  parseToken Pipe
+  guards <- oneOrMoreSep Comma parseGuard
+  pure $ guards
+
+parseGuard :: Parser Guard
+parseGuard =
+  Guard_Pat <$> parsePat <*> parseInfixExp `precededBy` LeftArrow
+    <|> Guard_Decls <$> parseDecls `precededBy` Keyword Let
+    <|> Guard_Infix <$> parseInfixExp
 
 parseExp :: Parser Exp
 parseExp = Exp_InfixExp <$> parseInfixExp
@@ -551,7 +630,13 @@ parseInfixExp =
     <|> InfixExp_LExp <$> parseLExp
 
 parseLExp :: Parser LExp
-parseLExp = LExp_FExp <$> parseFExp -- TODO more
+parseLExp =
+  LExp_Lambda <$> oneOrMore parseAPat `precededBy` Backslash <*> parseExp `precededBy` SingleArrow
+    <|> LExp_Let <$> parseDecls `precededBy` Keyword Let <*> parseExp `precededBy` Keyword In
+    <|> LExp_IfElse <$> parseExp `precededBy` Keyword If <* optional (parseToken SemiColon) <*> parseExp `precededBy` Keyword Then <* optional (parseToken SemiColon) <*> parseExp `precededBy` Keyword Else
+    <|> LExp_Case <$> parseExp `precededBy` Keyword Case <*> betweenBraces parseAlts `precededBy` Keyword Of
+    <|> LExp_Do <$> betweenBraces parseStmts `precededBy` Keyword Do
+    <|> LExp_FExp <$> parseFExp
 
 parseFExp :: Parser FExp
 parseFExp = do
@@ -571,6 +656,36 @@ parseAExp =
     <|> betweenParans (AExp_RightSect <$> parseQOp <*> parseInfixExp) -- TODO ignore ⟨-⟩
     <|> AExp_LabelCon <$> parseQCon <*> zeroOrMore parseFBind
 
+parseAlts :: Parser Alts
+parseAlts = oneOrMoreSep SemiColon parseAlt
+
+parseAlt :: Parser Alt
+parseAlt =
+  Alt_Exp <$> parsePat <*> parseExp `precededBy` SingleArrow <*> optional (parseDecls `precededBy` Keyword Where)
+    <|> Alt_GdPat <$> parsePat <*> parseGdPat <*> optional (parseDecls `precededBy` Keyword Where)
+    <|> Alt_Empty <$ parseNop
+
+parseGdPat :: Parser GdPat
+parseGdPat = do
+  guards <- parseGuards
+  parseToken SingleArrow
+  exp <- parseExp
+  maybeGdPat <- optional parseGdPat
+  pure $ GdPat guards exp maybeGdPat
+
+parseStmts :: Parser Stmts
+parseStmts = do
+  stmts <- zeroOrMore parseStmt
+  exp <- trailingSemicolon parseExp
+  pure $ Stmts stmts exp
+
+parseStmt :: Parser Stmt
+parseStmt =
+  Stmt_Exp <$> parseExp `followedBy` SemiColon
+    <|> Stmt_Pat <$> parsePat <*> between parseExp LeftArrow SemiColon
+    <|> Stmt_Decls <$> between parseDecls (Keyword Let) SemiColon
+    <|> Stmt_Empty <$ parseToken SemiColon
+
 parseFBind :: Parser FBind
 parseFBind = do
   qVar <- parseQVar
@@ -579,10 +694,12 @@ parseFBind = do
   return (FBind qVar exp)
 
 parsePat :: Parser Pat
-parsePat = Pat_LPat <$> parseLPat
+parsePat =
+  Pat_Infix <$> parseLPat <*> parseQConOp <*> parsePat
+    <|> Pat_LPat <$> parseLPat
 
 parseLPat :: Parser LPat
-parseLPat = LPat_APat <$> parseAPat
+parseLPat = LPat_APat <$> parseAPat -- TODO
 
 parseAPat :: Parser APat
 parseAPat =
@@ -590,12 +707,21 @@ parseAPat =
     <|> APat_GCon <$> parseGCon
     <|> APat_QCon <$> parseQCon <*> zeroOrMore parseFPat
     <|> APat_Lit <$> parseLiteral
+    <|> APat_Wildcard <$ parseToken Underscore
+    <|> APat_Paran <$> betweenParans parsePat
+    <|> APat_Tuple <$> tupled parsePat
+    <|> APat_List <$> listed parsePat
+    <|> APat_Irrefut <$> parseAPat `precededBy` Tilde
 
 parseFPat :: Parser FPat
 parseFPat = FPat <$> parseQVar <*> parsePat
 
 parseGCon :: Parser GCon
-parseGCon = GCon_QCon <$> parseQCon
+parseGCon =
+  GCon_Unit <$ parseTokens [LeftParan, RightParan]
+    <|> GCon_List <$ parseTokens [LeftBracket, RightBracket]
+    <|> GCon_Tuple <$ betweenParans (zeroOrMore (parseToken Comma))
+    <|> GCon_QCon <$> parseQCon
 
 parseVar :: Parser Var
 parseVar = Var <$> parseVarId
@@ -619,7 +745,9 @@ parseConOp :: Parser ConOp
 parseConOp = ConOp <$> parseConSym
 
 parseQConOp :: Parser QConOp
-parseQConOp = QConOp <$> parseGConSym
+parseQConOp =
+  QConOp_GConSym <$> parseGConSym
+    <|> QConOp_QConId <$> parseQConId
 
 parseOp :: Parser Op
 parseOp =
@@ -631,5 +759,7 @@ parseQOp =
   QOp_QVarOp <$> parseQVarOp
     <|> QOp_QConOp <$> parseQConOp
 
-parseGConSym :: Parser QConSym
-parseGConSym = parseQConSym -- TODO
+parseGConSym :: Parser GConSym
+parseGConSym =
+  GConSym_Colon <$ parseToken Colon
+    <|> GConSym_QConSym <$> parseQConSym

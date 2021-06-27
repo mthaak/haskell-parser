@@ -4,21 +4,34 @@ module Tokens
   )
 where
 
--- TODO more keywords
 data KeywordToken
-  = Module -- module
-  | Where -- where
-  | Data -- data
-  | Deriving -- deriving
-  | Instance -- instance
-  | Type -- type
-  | NewType -- newtype
+  = -- reservedid:
+    Case -- case
   | Class -- class
+  | Data -- data
   | Default -- default
-  | Let -- let
-  | In -- in
-  | Of -- of
+  | Deriving -- deriving
   | Do -- do
+  | Else -- else
+  | Foreign -- foreign
+  | If -- If
+  | Import -- import
+  | In -- in
+  | Infix -- infix
+  | Infixl -- infixl
+  | Infixr -- infixr
+  | Instance -- instance
+  | Let -- let
+  | Module -- module
+  | NewType -- newtype
+  | Of -- of
+  | Then -- then
+  | Type -- type
+  | Where -- where
+  -- Not in Lexical Syntax
+  | As -- as
+  | Hiding -- hiding
+  | Qualified -- qualified
   deriving (Eq, Ord, Show)
 
 -- TODO blockcomment
@@ -37,6 +50,7 @@ data Token
   | -- Symbols
     SingleArrow -- ->
   | DoubleArrow -- =>
+  | LeftArrow -- <-
   | DoubleColon -- ::
   | DoubleDot -- ..
   | Space -- " "
@@ -70,6 +84,7 @@ data Token
   | RightBracket -- ]
   | LeftBrace -- {
   | RightBrace -- }
+  | Underscore -- _
   | EOF -- end of file
   | Other -- anything else
   deriving (Eq, Ord, Show)

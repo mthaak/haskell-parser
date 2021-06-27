@@ -2,7 +2,7 @@ module Main where
 
 import Layout (convertLayout)
 import Lexer (ScanItem (..), lexer)
-import Parser (parseTokens)
+import Parser (parse)
 import System.Environment
 import System.Exit
 import Text.Printf
@@ -40,6 +40,6 @@ run input = do
   putStrLn ""
 
   -- Run parser
-  let parsed = parseTokens scanItems'
+  let parsed = parse scanItems'
   putStrLn "Parse result:"
   putStrLn . either show (prettyprint . show) $ parsed
