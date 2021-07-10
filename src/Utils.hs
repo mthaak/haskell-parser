@@ -2,6 +2,7 @@ module Utils
   ( headMaybe,
     firstJust,
     prettyprint,
+    sublist,
   )
 where
 
@@ -37,3 +38,8 @@ prettyprint str = remEmptyLines $ fn str 0
     indent n = replicate n ' '
     remEmptyLines = unlines . filter (not . isEmpty) . lines
     isEmpty line = strNull (strTrim line)
+
+sublist :: Int -> Int -> [a] -> [a]
+sublist a b xs = take n (drop a xs)
+  where
+    n = if b >= 0 then b - a else length xs + b - a

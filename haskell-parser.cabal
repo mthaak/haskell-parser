@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 674272d43d8168773b880f8a23add5dae2646a88e6f0b3834dd3a359c28c898b
+-- hash: 7b1fb433a1e6ee3ef623b956ff2126c300be51719ae351eabbf052261c2a5c19
 
 name:           haskell-parser
 version:        0.1.0
@@ -32,6 +32,7 @@ library
       Layout
       Lexer
       Parser
+      Prescan
       Tokens
       Utils
   other-modules:

@@ -1,5 +1,6 @@
 module Main where
 
+import Prescan (prescan)
 import Layout (convertLayout)
 import Lexer (ScanItem (..), lexer)
 import Parser (parse)
@@ -24,9 +25,15 @@ run input = do
   putStrLn "Running..."
 
   putStrLn ""
+  
+  -- Prescan
+  let (prescanned, pragmas) = prescan input
+  putStrLn . printf "Pragmas: %s" $ show pragmas
 
+  putStrLn ""
+  
   -- Run lexical analysis
-  let scanItems = lexer input
+  let scanItems = lexer prescanned
   putStrLn . printf "Number of non identified characters: %d" $
     length (filter (\st -> scanTok st == Other) scanItems)
 
