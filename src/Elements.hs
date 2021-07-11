@@ -124,8 +124,8 @@ data ImpSpec
 
 data Import
   = Import_Var Var
-  | Import_TyCon (Either All [CName])
-  | Import_TyCls (Either All [Var])
+  | Import_TyCon TyCon (Maybe (Either All [CName]))
+  | Import_TyCls TyCls (Maybe (Either All [Var]))
   deriving (Eq, Show)
 
 type CName = Either Var Con

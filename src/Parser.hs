@@ -222,11 +222,22 @@ precededBy :: Parser a -> Token -> Parser a
 precededBy pa t = do
   parseToken t
   pa
+  
+precededByOpt :: Parser a -> Token -> Parser a
+precededByOpt pa t = do
+  optional $ parseToken t
+  pa
 
 followedBy :: Parser a -> Token -> Parser a
 followedBy pa t = do
   result <- pa
   parseToken t
+  return result
+  
+followedByOpt :: Parser a -> Token -> Parser a
+followedByOpt pa t = do
+  result <- pa
+  optional $ parseToken t
   return result
 
 precedes :: Token -> Parser a -> Parser a
@@ -427,8 +438,8 @@ parseImpSpec =
 parseImport :: Parser Import
 parseImport =
   Import_Var <$> parseVar
-    <|> Import_TyCon <$> Parser.either parseAll (tupled parseCName)
-    <|> Import_TyCls <$> Parser.either parseAll (tupled parseVar)
+    <|> Import_TyCon <$> parseTyCon <*> optional (Parser.either parseAll (tupled parseCName))
+    <|> Import_TyCls <$> parseTyCls <*> optional (Parser.either parseAll (tupled parseVar))
 
 parseCName :: Parser CName
 parseCName = Parser.either parseVar parseCon
@@ -540,7 +551,8 @@ parseConstrs = oneOrMoreSep Pipe parseConstr
 
 parseConstr :: Parser Constr
 parseConstr =
-  Constr_ATypes <$> parseCon <*> parseEmpty []
+  Constr_ATypes <$> parseCon <*> zeroOrMore (parseAType `precededByOpt` Exclamation)
+  -- TODO
     <|> Constr_FieldDecls <$> parseCon <*> betweenBraces (zeroOrMoreSep Comma parseFieldDecl)
 
 parseNewConstr :: Parser NewConstr
