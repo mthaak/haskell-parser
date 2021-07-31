@@ -7,7 +7,7 @@ import Common (Coordinates)
 import Data.Either (fromRight, isLeft, isRight, rights)
 import Data.List (find)
 import Data.Maybe (fromJust, isJust)
-import Debug.Trace (traceShowId)
+import Debug.Trace (traceShow, traceShowId)
 import Lexer (ScanItem (..))
 import Tokens
 
@@ -116,9 +116,11 @@ funL (Right (ScanItem _ _ RightBrace) : ts) ms = Left LayoutError
 -- L ({ : ts) ms = { : (L ts (0 : ms))
 funL (Right (ScanItem _ _ LeftBrace) : ts) ms = Right (ScanItem x "{" LeftBrace) >: funL ts (0 : ms)
 -- L (t : ts) (m : ms) if m ∕= 0 and parse-error(t) = } : (L (t : ts) ms)
-funL (t : ts) (m : ms) | m /= 0 && parseError = Right (ScanItem x "}" RightBrace) >: funL (t : ts) ms
-  where
-    parseError = isLeft (funL (t : ts) ms) && isRight (funL (Right (ScanItem x "}" RightBrace) : t : ts) ms)
+-- TODO fix this condition
+-- Luckily the program still works when disabling it, but it's not clear in which cases it won't work
+--funL (t : ts) (m : ms) | m /= 0 && parseError = Right (ScanItem x "}" RightBrace) >: funL (t : ts) ms
+--  where
+--    parseError = ??
 -- L (t : ts) ms = t : (L ts ms)
 funL (Right t : ts) ms = Right t >: funL ts ms
 -- L [] [] = []

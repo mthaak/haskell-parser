@@ -20,7 +20,15 @@ test_parseConSym =
   TestCase
     ( canParse
         parseConSym
-        [si (0, 0) ":" Colon]
+        [si (0, 0) ":+" Colon]
+    )
+
+test_parseVarSym_DoubleEquals :: Test
+test_parseVarSym_DoubleEquals =
+  TestCase
+    ( canParse
+        parseVarSym
+        [ScanItem (20, 50) "=" Equals, ScanItem (20, 51) "=" Equals]
     )
 
 test_parseDecls :: Test
@@ -69,6 +77,38 @@ test_parseFunLhs_Pat =
     ( canParse
         parseFunLhs
         [si (0, 0) "add" ValueName, si (0, 0) "[" LeftBracket, si (0, 0) "]" RightBracket]
+    )
+
+test_parseGdRhs :: Test
+test_parseGdRhs =
+  TestCase
+    ( canParse
+        parseGdRhs
+        [si (21, 3) "|" Pipe, si (21, 5) "scanTok" ValueName, si (21, 14) "=" Equals, si (21, 16) "1" IntegerLiteral]
+    )
+
+test_parseGuards :: Test
+test_parseGuards =
+  TestCase
+    ( canParse
+        parseGuards
+        [si (21, 3) "|" Pipe, si (21, 5) "scanTok" ValueName]
+    )
+
+test_parseExp_Literal :: Test
+test_parseExp_Literal =
+  TestCase
+    ( canParse
+        parseExp
+        [si (0, 0) "1" IntegerLiteral]
+    )
+
+test_parseExp_DoubleEquals :: Test
+test_parseExp_DoubleEquals =
+  TestCase
+    ( canParse
+        parseExp
+        [ScanItem (20, 47) "ab" ValueName, ScanItem (20, 50) "=" Equals, ScanItem (20, 51) "=" Equals, ScanItem (20, 53) "2" IntegerLiteral]
     )
 
 test_parseRhs_Exp1 :: Test
@@ -151,6 +191,14 @@ test_parsePat_LPat =
         [si (0, 0) "x" ValueName]
     )
 
+test_parseLPat_GCon :: Test
+test_parseLPat_GCon =
+  TestCase
+    ( canParse
+        parseLPat
+        [si (72,23) "Si" TypeName, si (72,26) "a" ValueName]
+    )
+
 test_parseAPat_Var :: Test
 test_parseAPat_Var =
   TestCase
@@ -166,13 +214,23 @@ test_parseAPat_head_tail =
         parseAPat
         [si (19, 11) "(" LeftParan, si (19, 12) "x" ValueName, si (19, 14) ":" Colon, si (19, 16) "xs" ValueName, si (19, 18) ")" RightParan]
     )
+    
+
+test_parseGCon_QCon :: Test
+test_parseGCon_QCon =
+  TestCase
+    ( canParse
+        parseGCon
+        [si (72,23) "Si" TypeName]
+    )
 
 parserTests :: Test
 parserTests =
   TestLabel
     "ParserTests"
     ( TestList
-        [ TestLabel "test_parseConSym" test_parseConSym,
+        [ TestLabel "test_parseVarSym_DoubleEquals" test_parseVarSym_DoubleEquals,
+          TestLabel "test_parseConSym" test_parseConSym,
           TestLabel "test_parseDecls" test_parseDecls,
           TestLabel "test_parseDecl_GenDecl" test_parseDecl_GenDecl,
           TestLabel "test_parseDecl_Pat" test_parseDecl_Pat,
@@ -183,13 +241,19 @@ parserTests =
           TestLabel "test_parseRhs_Exp2" test_parseRhs_Exp2,
           TestLabel "test_parseVarSym" test_parseVarSym,
           TestLabel "test_parseLExp" test_parseLExp,
+          TestLabel "test_parseGdRhs" test_parseGdRhs,
+          TestLabel "test_parseGuards" test_parseGuards,
+          TestLabel "test_parseExp_Literal" test_parseExp_Literal,
+          TestLabel "test_parseExp_DoubleEquals" test_parseExp_DoubleEquals,
           TestLabel "test_parseInfixExp" test_parseInfixExp,
           TestLabel "test_ParseTopDecl_Data" test_ParseTopDecl_Data,
           TestLabel "test_ParseConstrs" test_ParseConstrs,
           TestLabel "test_ParseConstr" test_ParseConstr,
           TestLabel "test_parseDeriving" test_parseDeriving,
           TestLabel "test_parsePat_LPat" test_parsePat_LPat,
+          TestLabel "test_parseLPat_GCon" test_parseLPat_GCon,
           TestLabel "test_parseAPat_Var" test_parseAPat_Var,
-          TestLabel "test_parseAPat_head_tail" test_parseAPat_head_tail
+          TestLabel "test_parseAPat_head_tail" test_parseAPat_head_tail,
+          TestLabel "test_parseGCon_QCon" test_parseGCon_QCon
         ]
     )

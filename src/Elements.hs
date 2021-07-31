@@ -168,6 +168,8 @@ data IDecl
 
 data GenDecl
   = GenDecl_TypeSig Vars (Maybe Context) Type
+  | GenDecl_Fixity Fixity (Maybe LitInteger) Ops
+  | GenDecl_Empty
   deriving (Eq, Show)
 
 -- Operators
@@ -175,6 +177,13 @@ type Ops = [Op]
 
 -- Variables
 type Vars = [Var]
+
+-- Fixity
+data Fixity
+  = Fixity_Infixl
+  | Fixity_Infixr
+  | Fixity_Infix
+  deriving (Eq, Show) -- TODO
 
 -- Function type
 -- TODO make recursive?
@@ -257,9 +266,14 @@ data FunLhs
   deriving (Eq, Show)
 
 -- Right hand side
-data Rhs = Rhs_Exp Exp (Maybe Decls)
+data Rhs
+  = Rhs_Exp Exp (Maybe Decls)
+  | Rhs_GdRhs GdRhs (Maybe Decls)
   deriving (Eq, Show)
 
+data GdRhs = GdRhs Guards Exp (Maybe GdRhs)
+  deriving (Eq, Show)
+  
 type Guards = [Guard]
 
 data Guard
@@ -340,7 +354,9 @@ data Pat
   deriving (Eq, Show)
 
 data LPat
-  = LPat_APat APat -- TODO
+  = LPat_APat APat
+  | LPat_NegLit (Either LitInteger LitFloat)
+  | LPat_GCon GCon [APat]
   deriving (Eq, Show)
 
 data APat
@@ -367,31 +383,41 @@ data GCon
   deriving (Eq, Show)
 
 -- Variable
-data Var = Var VarId -- TODO
+data Var = Var_VarId VarId
+  | Var_VarSym VarSym
   deriving (Eq, Show)
 
 -- Qualified variable
-data QVar = QVar QVarId -- TODO
+data QVar = QVar_QVarId QVarId
+  | QVar_QVarSym QVarSym
   deriving (Eq, Show)
 
 -- Constructor
-data Con = Con ConId -- TODO
+data Con = Con_ConId ConId
+  | Con_ConSym ConSym
   deriving (Eq, Show)
 
 -- Qualified constructor
-data QCon = QCon QConId -- TODO
+data QCon = QCon_QCondId QConId
+  | QCon_QConSym QConSym
   deriving (Eq, Show)
 
 -- Variable operator
-data VarOp = VarOp VarSym -- TODO
+data VarOp
+  = VarOp_VarSym VarSym
+  | VarOp_VarId VarId
   deriving (Eq, Show)
 
 -- Qualified variable operator
-data QVarOp = QVarOp QVarSym -- TODO
+data QVarOp
+  = QVarOp_QVarSym QVarSym
+  | QVarOp_QVarId QVarId
   deriving (Eq, Show)
 
 -- Constructor operator
-data ConOp = ConOp ConSym -- TODO
+data ConOp
+  = ConOp_ConSym ConSym
+  | ConOp_ConId ConId
   deriving (Eq, Show)
 
 -- Qualified constructor operator

@@ -9,9 +9,10 @@ import System.Exit
 import Text.Printf
 import Tokens (Token (Other))
 import Utils (prettyprint)
+import System.TimeIt (timeIt)
 
 main :: IO ()
-main = getArgs >>= parseArgs >>= run
+main = timeIt $ getArgs >>= parseArgs >>= run
 
 parseArgs :: [FilePath] -> IO [Char]
 parseArgs [] = usage >> exitSuccess
@@ -25,13 +26,13 @@ run input = do
   putStrLn "Running..."
 
   putStrLn ""
-  
+
   -- Prescan
   let (prescanned, pragmas) = prescan input
   putStrLn . printf "Pragmas: %s" $ show pragmas
 
   putStrLn ""
-  
+
   -- Run lexical analysis
   let scanItems = lexer prescanned
   putStrLn . printf "Number of non identified characters: %d" $

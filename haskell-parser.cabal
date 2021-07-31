@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7b1fb433a1e6ee3ef623b956ff2126c300be51719ae351eabbf052261c2a5c19
+-- hash: 30acf5c7eb454a35522a2c12652f34b3ee4d7f42b0361f7050879856e6422d03
 
 name:           haskell-parser
 version:        0.1.0
@@ -44,6 +44,7 @@ library
     , base >=4.7 && <5
     , prettyprinter
     , strings
+    , timeit
   default-language: Haskell2010
 
 executable haskell-parser-exe
@@ -59,6 +60,7 @@ executable haskell-parser-exe
     , haskell-parser
     , prettyprinter
     , strings
+    , timeit
   default-language: Haskell2010
 
 test-suite haskell-parser-test
@@ -76,4 +78,5 @@ test-suite haskell-parser-test
     , haskell-parser
     , prettyprinter
     , strings
+    , timeit
   default-language: Haskell2010

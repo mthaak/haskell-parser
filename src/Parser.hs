@@ -12,6 +12,9 @@ module Parser
     parseFunLhs,
     parseRhs,
     parseVarSym,
+    parseGdRhs,
+    parseGuards,
+    parseExp,
     parseLExp,
     parseInfixExp,
     parseTopDecl,
@@ -19,7 +22,9 @@ module Parser
     parseConstr,
     parseDeriving,
     parsePat,
+    parseLPat,
     parseAPat,
+    parseGCon,
   )
 where
 
@@ -32,7 +37,7 @@ import Debug.Trace (traceM)
 import Elements
 import Lexer (ScanItem (..))
 import Text.Printf (printf)
-import Tokens (KeywordToken (..), Token (..))
+import Tokens (KeywordToken (..), Token (..), isDashes, isReservedOp)
 
 parse :: Input -> Either ParseError Module
 parse input = do
@@ -102,11 +107,11 @@ errorMsg (ParseError _ s) = s
 
 -- PARSERS HELPERS
 
-fail :: p -> Either ParseError b
-fail _ = Left $ ParseError (0, 0) "Fail"
+fail :: Either ParseError a
+fail = Left $ ParseError (0, 0) "Fail"
 
 parseFail :: Parser a
-parseFail = Parser Parser.fail
+parseFail = Parser $ const Parser.fail
 
 parseNothing :: Parser (Maybe a)
 parseNothing = Parser $ \s -> Right (Nothing, s)
@@ -215,6 +220,12 @@ betweenParans pa = between pa Tokens.LeftParan Tokens.RightParan
 betweenBraces :: Parser a -> Parser a
 betweenBraces pa = between pa Tokens.LeftBrace Tokens.RightBrace
 
+betweenBrackets :: Parser a -> Parser a
+betweenBrackets pa = between pa Tokens.LeftBracket Tokens.RightBracket
+
+betweenTicks :: Parser a -> Parser a
+betweenTicks pa = between pa Tokens.BackTick Tokens.BackTick
+
 parseEmpty :: a -> Parser a
 parseEmpty a = Parser $ \s -> Right (a, s)
 
@@ -222,7 +233,7 @@ precededBy :: Parser a -> Token -> Parser a
 precededBy pa t = do
   parseToken t
   pa
-  
+
 precededByOpt :: Parser a -> Token -> Parser a
 precededByOpt pa t = do
   optional $ parseToken t
@@ -233,7 +244,7 @@ followedBy pa t = do
   result <- pa
   parseToken t
   return result
-  
+
 followedByOpt :: Parser a -> Token -> Parser a
 followedByOpt pa t = do
   result <- pa
@@ -263,14 +274,19 @@ parseAll = do
   betweenParans (parseToken DoubleDot)
   return All
 
+failIf :: (a -> Bool) -> Parser a -> Parser a
+failIf cond pa = do
+  x <- pa
+  if cond x then pure x else failure
+
 -- PARSE TERMINALS
 
 parseLiteral :: Parser Literal
 parseLiteral =
-  Literal_Int <$> parseLitInteger
-    <|> Literal_Float <$> parseLitFloat
-    <|> Literal_Char <$> parseLitChar
-    <|> Literal_String <$> parseLitString
+  Literal_Int <$> parseInteger
+    <|> Literal_Float <$> parseFloat
+    <|> Literal_Char <$> parseChar
+    <|> Literal_String <$> parseString
 
 getNext :: Parser Token
 getNext = Parser fn
@@ -314,17 +330,17 @@ parseSymbolString = oneOfTokensAsString ascSymbolList
 
 parseVarSym :: Parser VarSym
 parseVarSym = do
-  -- TODO ignore ⟨reservedop | dashes⟩
   firstSymbol <- oneOfTokensAsString (symbolList \\ [Tokens.Colon])
-  symbols <- zeroOrMore parseSymbolString
-  return (VarSym (concat (firstSymbol : symbols)))
+  remSymbols <- zeroOrMore parseSymbolString
+  let symbols = concat (firstSymbol : remSymbols)
+  if isReservedOp symbols || isDashes symbols then failure else pure (VarSym symbols)
 
 parseConSym :: Parser ConSym
 parseConSym = do
-  -- TODO ignore ⟨reservedop⟩
-  colon <- parseTokenAsString Tokens.Colon
-  symbols <- zeroOrMore parseSymbolString
-  return (ConSym (concat (colon : symbols)))
+  firstSymbol <- parseTokenAsString Tokens.Colon
+  remSymbols <- zeroOrMore parseSymbolString
+  let symbols = concat (firstSymbol : remSymbols)
+  if isReservedOp symbols then failure else pure (ConSym symbols)
 
 parseVarId :: Parser VarId
 parseVarId = VarId <$> parseTokenAsString Tokens.ValueName
@@ -370,17 +386,17 @@ parseQConSym = do
   (ConSym conSymStr) <- parseConSym
   pure $ QConSym (modIdStr ++ conSymStr)
 
-parseLitInteger :: Parser LitInteger
-parseLitInteger = LitInteger <$> parseTokenAsString Tokens.IntegerLiteral
+parseInteger :: Parser LitInteger
+parseInteger = LitInteger <$> parseTokenAsString Tokens.IntegerLiteral
 
-parseLitFloat :: Parser LitFloat
-parseLitFloat = LitFloat <$> parseTokenAsString Tokens.FloatLiteral
+parseFloat :: Parser LitFloat
+parseFloat = LitFloat <$> parseTokenAsString Tokens.FloatLiteral
 
-parseLitChar :: Parser LitChar
-parseLitChar = LitChar <$> parseTokenAsString Tokens.CharLiteral
+parseChar :: Parser LitChar
+parseChar = LitChar <$> parseTokenAsString Tokens.CharLiteral
 
-parseLitString :: Parser LitString
-parseLitString = LitString <$> parseTokenAsString Tokens.StringLiteral
+parseString :: Parser LitString
+parseString = LitString <$> parseTokenAsString Tokens.StringLiteral
 
 -- NON-TERMINAL PARSERS
 
@@ -485,18 +501,32 @@ parseIDecl =
     <|> IDecl_Var <$> parseVar <*> parseRhs
 
 parseGenDecl :: Parser GenDecl
-parseGenDecl = do
-  vars <- zeroOrMore parseVar
-  parseToken DoubleColon
-  maybeContext <- optional (parseContext `followedBy` Tokens.DoubleArrow)
-  type_ <- parseType
-  pure $ GenDecl_TypeSig vars maybeContext type_
+parseGenDecl =
+  ( do
+      vars <- zeroOrMore parseVar
+      parseToken DoubleColon
+      maybeContext <- optional (parseContext `followedBy` Tokens.DoubleArrow)
+      type_ <- parseType
+      pure $ GenDecl_TypeSig vars maybeContext type_
+  )
+    <|> ( do
+            fixity <- parseFixity
+            maybeInteger <- optional parseInteger
+            ops <- parseOps
+            pure $ GenDecl_Fixity fixity maybeInteger ops
+        )
 
 parseOps :: Parser Ops
 parseOps = oneOrMoreSep Comma parseOp
 
 parseVars :: Parser Vars
 parseVars = oneOrMoreSep Comma parseVar
+
+parseFixity :: Parser Fixity
+parseFixity =
+  Fixity_Infixl <$ parseToken (Keyword Infixl)
+    <|> Fixity_Infixr <$ parseToken (Keyword Infixr)
+    <|> Fixity_Infix <$ parseToken (Keyword Infix)
 
 parseType :: Parser Type
 parseType = do
@@ -513,8 +543,8 @@ parseAType =
   AType_GTyCon <$> parseGTyCon
     <|> AType_TyVar <$> parseTyVar
     <|> AType_Tuple <$> tupled parseType
-    <|> AType_List <$> between parseType Tokens.LeftBracket Tokens.RightBracket
-    <|> AType_ParanCon <$> between parseType Tokens.LeftParan Tokens.RightParan
+    <|> AType_List <$> betweenBrackets parseType
+    <|> AType_ParanCon <$> betweenParans parseType
 
 parseGTyCon :: Parser GTyCon
 parseGTyCon =
@@ -552,7 +582,7 @@ parseConstrs = oneOrMoreSep Pipe parseConstr
 parseConstr :: Parser Constr
 parseConstr =
   Constr_ATypes <$> parseCon <*> zeroOrMore (parseAType `precededByOpt` Exclamation)
-  -- TODO
+    -- TODO
     <|> Constr_FieldDecls <$> parseCon <*> betweenBraces (zeroOrMoreSep Comma parseFieldDecl)
 
 parseNewConstr :: Parser NewConstr
@@ -612,13 +642,17 @@ parseFunLhs =
     <|> FunLhs_Fun <$> betweenParans parseFunLhs <*> oneOrMore parseAPat
 
 parseRhs :: Parser Rhs
-parseRhs = do
+parseRhs =
+  Rhs_Exp <$> parseExp `precededBy` Equals <*> optional (parseDecls `precededBy` Keyword Where)
+    <|> Rhs_GdRhs <$> parseGdRhs <*> optional (parseDecls `precededBy` Keyword Where)
+
+parseGdRhs :: Parser GdRhs
+parseGdRhs = do
+  guards <- parseGuards
   parseToken Tokens.Equals
   exp <- parseExp
-  maybeWhere <- optional (parseDecls `precededBy` Keyword Where)
-  return $ Rhs_Exp exp maybeWhere
-
--- TODO gdrhs
+  maybeGdRhs <- optional parseGdRhs
+  pure $ GdRhs guards exp maybeGdRhs
 
 parseGuards :: Parser Guards
 parseGuards = do
@@ -711,7 +745,12 @@ parsePat =
     <|> Pat_LPat <$> parseLPat
 
 parseLPat :: Parser LPat
-parseLPat = LPat_APat <$> parseAPat -- TODO
+-- order changed to parse smallest possibility last
+parseLPat =
+  LPat_GCon <$> parseGCon <*> oneOrMore parseAPat
+  <|> LPat_NegLit <$> Parser.either parseInteger parseFloat `precededBy` Dash
+  <|> LPat_APat <$> parseAPat
+
 
 parseAPat :: Parser APat
 parseAPat =
@@ -736,30 +775,40 @@ parseGCon =
     <|> GCon_QCon <$> parseQCon
 
 parseVar :: Parser Var
-parseVar = Var <$> parseVarId
+parseVar = Var_VarId <$> parseVarId
+  <|> Var_VarSym <$> betweenParans parseVarSym
 
 parseQVar :: Parser QVar
-parseQVar = QVar <$> parseQVarId
+parseQVar = QVar_QVarId <$> parseQVarId
+  <|> QVar_QVarSym <$> betweenParans parseQVarSym
 
 parseCon :: Parser Con
-parseCon = Con <$> parseConId
+parseCon = Con_ConId <$> parseConId
+  <|> Con_ConSym <$> betweenParans parseConSym
 
 parseQCon :: Parser QCon
-parseQCon = QCon <$> parseQConId
+parseQCon = QCon_QCondId <$> parseQConId
+  <|> QCon_QConSym <$> betweenParans parseQConSym
 
 parseVarOp :: Parser VarOp
-parseVarOp = VarOp <$> parseVarSym
+parseVarOp =
+  VarOp_VarSym <$> parseVarSym
+    <|> VarOp_VarId <$> betweenTicks parseVarId
 
 parseQVarOp :: Parser QVarOp
-parseQVarOp = QVarOp <$> parseQVarSym
+parseQVarOp =
+  QVarOp_QVarSym <$> parseQVarSym
+    <|> QVarOp_QVarId <$> betweenTicks parseQVarId
 
 parseConOp :: Parser ConOp
-parseConOp = ConOp <$> parseConSym
+parseConOp =
+  ConOp_ConSym <$> parseConSym
+    <|> ConOp_ConId <$> betweenTicks parseConId
 
 parseQConOp :: Parser QConOp
 parseQConOp =
   QConOp_GConSym <$> parseGConSym
-    <|> QConOp_QConId <$> parseQConId
+    <|> QConOp_QConId <$> betweenTicks parseQConId
 
 parseOp :: Parser Op
 parseOp =

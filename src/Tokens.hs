@@ -1,6 +1,8 @@
 module Tokens
   ( KeywordToken (..),
     Token (..),
+    isReservedOp,
+    isDashes,
   )
 where
 
@@ -88,3 +90,24 @@ data Token
   | EOF -- end of file
   | Other -- anything else
   deriving (Eq, Ord, Show)
+
+reservedOpList :: [String]
+reservedOpList =
+  [ "..",
+    ":",
+    "::",
+    "=",
+    "\\",
+    "|",
+    "<-",
+    "->",
+    "@",
+    "~",
+    "=>"
+  ]
+
+isReservedOp :: String -> Bool
+isReservedOp str = str `elem` reservedOpList
+
+isDashes :: String -> Bool
+isDashes str = length str >= 2 && all (== '-') str

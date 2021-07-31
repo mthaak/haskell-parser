@@ -24,6 +24,7 @@ dependencies:
   - strings
   - prettyprinter
   - HUnit
+  - timeit
 
 library:
   source-dirs: src
