@@ -132,7 +132,7 @@ test_parseVarSym =
   TestCase
     ( canParse
         parseVarSym
-        [si (0, 0) "<" LeftAngle, si (0, 0) "$" Dollar, si (0, 0) ">" RightAngle]
+        [si (0, 0) ">" LeftAngle, si (0, 0) "=" Dollar, si (0, 0) ">" RightAngle]
     )
 
 test_parseLExp :: Test
