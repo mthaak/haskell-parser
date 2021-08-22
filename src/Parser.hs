@@ -25,6 +25,7 @@ module Parser
     parseLPat,
     parseAPat,
     parseGCon,
+    parseVarOp,
   )
 where
 
@@ -51,53 +52,11 @@ parseLiteral =
     <|> Literal_Char <$> parseChar
     <|> Literal_String <$> parseString
 
-parseSymbol :: Parser Symbol
-parseSymbol = parseAscSymbol
-
-symbolList = ascSymbolList -- TODO add unicode symbols
-
-ascSymbolList =
-  [ Exclamation,
-    Hash,
-    Dollar,
-    Percent,
-    Ampersand,
-    Asterisk,
-    Plus,
-    Dot,
-    Divide,
-    LeftAngle,
-    Equals,
-    RightAngle,
-    Question,
-    At,
-    Backslash,
-    Caret,
-    Pipe,
-    Dash,
-    Tilde,
-    Colon
-  ]
-
-parseAscSymbol :: Parser Symbol
-parseAscSymbol = Symbol <$> oneOfTokens ascSymbolList
-
-parseSymbolString :: Parser String
-parseSymbolString = oneOfTokensAsString ascSymbolList
-
 parseVarSym :: Parser VarSym
-parseVarSym = do
-  firstSymbol <- oneOfTokensAsString (symbolList \\ [Tokens.Colon])
-  remSymbols <- zeroOrMore parseSymbolString
-  let symbols = concat (firstSymbol : remSymbols)
-  if isReservedOp symbols || isDashes symbols then failure else pure (VarSym symbols)
+parseVarSym = VarSym <$> parseTokenAsString Tokens.Varsym
 
 parseConSym :: Parser ConSym
-parseConSym = do
-  firstSymbol <- parseTokenAsString Tokens.Colon
-  remSymbols <- zeroOrMore parseSymbolString
-  let symbols = concat (firstSymbol : remSymbols)
-  if isReservedOp symbols then failure else pure (ConSym symbols)
+parseConSym = ConSym <$> parseTokenAsString Tokens.Consym
 
 parseVarId :: Parser VarId
 parseVarId = VarId <$> parseTokenAsString Tokens.ValueName
@@ -134,14 +93,10 @@ parseQTyCls :: Parser QTyCls
 parseQTyCls = parseTyCls
 
 parseQVarSym :: Parser QVarSym
-parseQVarSym = parseVarSym
+parseQVarSym = QVarSym <$> optional (parseModId `followedBy` Dot) <*> parseVarSym
 
 parseQConSym :: Parser QConSym
-parseQConSym = do
-  maybeModId <- optional parseModId `followedBy` Dot
-  let modIdStr = fromMaybe "" (fmap (\(ModId str) -> str ++ ".") maybeModId)
-  (ConSym conSymStr) <- parseConSym
-  pure $ QConSym (modIdStr ++ conSymStr)
+parseQConSym = QConSym <$> optional (parseModId `followedBy` Dot) <*> parseConSym
 
 parseInteger :: Parser LitInteger
 parseInteger = LitInteger <$> parseTokenAsString Tokens.IntegerLiteral
@@ -223,10 +178,10 @@ parseTopDecls = zeroOrMoreSep Tokens.SemiColon parseTopDecl
 parseTopDecl :: Parser TopDecl
 parseTopDecl =
   Keyword Tokens.Type `precedes` (TopDecl_Type <$> parseSimpleType <*> parseType `precededBy` Equals)
-    <|> Keyword Data `precedes` (TopDecl_Data <$> optional (parseContext `followedBy` DoubleArrow) <*> parseSimpleType <*> optional (parseConstrs `precededBy` Equals) <*> optional parseDeriving)
-    <|> Keyword NewType `precedes` (TopDecl_NewType <$> optional (parseContext `followedBy` DoubleArrow) <*> parseSimpleType <*> parseNewConstr `precededBy` Equals <*> optional parseDeriving)
-    <|> Keyword Tokens.Class `precedes` (TopDecl_Class <$> optional (parseSContext `followedBy` DoubleArrow) <*> parseTyCls <*> parseTyVar <*> optional (parseCDecls `precededBy` Keyword Where))
-    <|> Keyword Instance `precedes` (TopDecl_Instance <$> optional (parseSContext `followedBy` DoubleArrow) <*> parseQTyCls <*> parseInst <*> optional (parseIDecls `precededBy` Keyword Where))
+    <|> Keyword Data `precedes` (TopDecl_Data <$> optional (parseContext `followedBy` DoubleRightArrow) <*> parseSimpleType <*> optional (parseConstrs `precededBy` Equals) <*> optional parseDeriving)
+    <|> Keyword NewType `precedes` (TopDecl_NewType <$> optional (parseContext `followedBy` DoubleRightArrow) <*> parseSimpleType <*> parseNewConstr `precededBy` Equals <*> optional parseDeriving)
+    <|> Keyword Tokens.Class `precedes` (TopDecl_Class <$> optional (parseSContext `followedBy` DoubleRightArrow) <*> parseTyCls <*> parseTyVar <*> optional (parseCDecls `precededBy` Keyword Where))
+    <|> Keyword Instance `precedes` (TopDecl_Instance <$> optional (parseSContext `followedBy` DoubleRightArrow) <*> parseQTyCls <*> parseInst <*> optional (parseIDecls `precededBy` Keyword Where))
     <|> Keyword Default `precedes` (TopDecl_Default <$> betweenBraces (zeroOrMoreSep Comma parseType))
     --  | TopDecl_Foreign [FDecl] -- TODO
     <|> TopDecl_Decl <$> parseDecl
@@ -262,7 +217,7 @@ parseGenDecl =
   ( do
       vars <- zeroOrMore parseVar
       parseToken DoubleColon
-      maybeContext <- optional (parseContext `followedBy` Tokens.DoubleArrow)
+      maybeContext <- optional (parseContext `followedBy` Tokens.DoubleRightArrow)
       type_ <- parseType
       pure $ GenDecl_TypeSig vars maybeContext type_
   )
@@ -423,6 +378,7 @@ parseGuard =
     <|> Guard_Decls <$> parseDecls `precededBy` Keyword Let
     <|> Guard_Infix <$> parseInfixExp
 
+-- TODO
 parseExp :: Parser Exp
 parseExp = Exp_InfixExp <$> parseInfixExp
 

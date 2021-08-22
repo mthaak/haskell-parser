@@ -20,15 +20,7 @@ test_parseConSym =
   TestCase
     ( canParse
         parseConSym
-        [si (0, 0) ":+" Colon]
-    )
-
-test_parseVarSym_DoubleEquals :: Test
-test_parseVarSym_DoubleEquals =
-  TestCase
-    ( canParse
-        parseVarSym
-        [ScanItem (20, 50) "=" Equals, ScanItem (20, 51) "=" Equals]
+        [si (0, 0) ":+" Consym]
     )
 
 test_parseDecls :: Test
@@ -52,7 +44,7 @@ test_parseDecl_FunLhs =
   TestCase
     ( canParse
         parseDecl
-        [si (0, 0) "add" ValueName, si (0, 0) "x" ValueName, si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Plus, si (0, 0) "3" IntegerLiteral]
+        [si (0, 0) "add" ValueName, si (0, 0) "x" ValueName, si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Varsym, si (0, 0) "3" IntegerLiteral]
     )
 
 test_parseDecl_GenDecl :: Test
@@ -60,7 +52,7 @@ test_parseDecl_GenDecl =
   TestCase
     ( canParse
         parseDecl
-        [si (0, 0) "add" ValueName, si (0, 0) "::" DoubleColon, si (0, 0) "Num" TypeName, si (0, 0) "a" ValueName, si (0, 0) "=>" DoubleArrow, si (0, 0) "a" ValueName, si (0, 0) "->" SingleArrow, si (0, 0) "a" ValueName]
+        [si (0, 0) "add" ValueName, si (0, 0) "::" DoubleColon, si (0, 0) "Num" TypeName, si (0, 0) "a" ValueName, si (0, 0) "=>" DoubleRightArrow, si (0, 0) "a" ValueName, si (0, 0) "->" SingleArrow, si (0, 0) "a" ValueName]
     )
 
 test_parseFunLhs_Var :: Test
@@ -108,7 +100,7 @@ test_parseExp_DoubleEquals =
   TestCase
     ( canParse
         parseExp
-        [ScanItem (20, 47) "ab" ValueName, ScanItem (20, 50) "=" Equals, ScanItem (20, 51) "=" Equals, ScanItem (20, 53) "2" IntegerLiteral]
+        [ScanItem (20, 47) "ab" ValueName, ScanItem (20, 50) "==" Varsym, ScanItem (20, 53) "2" IntegerLiteral]
     )
 
 test_parseRhs_Exp1 :: Test
@@ -124,7 +116,7 @@ test_parseRhs_Exp2 =
   TestCase
     ( canParse
         parseRhs
-        [si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Plus, si (0, 0) "3" IntegerLiteral]
+        [si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Varsym, si (0, 0) "3" IntegerLiteral]
     )
 
 test_parseVarSym :: Test
@@ -132,7 +124,7 @@ test_parseVarSym =
   TestCase
     ( canParse
         parseVarSym
-        [si (0, 0) ">" LeftAngle, si (0, 0) "=" Dollar, si (0, 0) ">" RightAngle]
+        [si (0, 0) ">=>" Varsym]
     )
 
 test_parseLExp :: Test
@@ -140,7 +132,7 @@ test_parseLExp =
   TestCase
     ( canParse
         parseLExp
-        [si (0, 0) "(" LeftParan, si (0, 0) "+" Plus, si (0, 0) "1" IntegerLiteral, si (0, 0) ")" RightParan]
+        [si (0, 0) "(" LeftParan, si (0, 0) "+" Varsym, si (0, 0) "1" IntegerLiteral, si (0, 0) ")" RightParan]
     )
 
 test_parseInfixExp :: Test
@@ -224,12 +216,20 @@ test_parseGCon_QCon =
         [si (72,23) "Si" TypeName]
     )
 
+test_parseVarOp :: Test
+test_parseVarOp =
+  TestCase
+    ( canParse
+        parseVarOp
+        [si (0,0) "++" Varsym]
+    )
+
 parserTests :: Test
 parserTests =
   TestLabel
     "ParserTests"
     ( TestList
-        [ TestLabel "test_parseVarSym_DoubleEquals" test_parseVarSym_DoubleEquals,
+        [
           TestLabel "test_parseConSym" test_parseConSym,
           TestLabel "test_parseDecls" test_parseDecls,
           TestLabel "test_parseDecl_GenDecl" test_parseDecl_GenDecl,
@@ -254,6 +254,7 @@ parserTests =
           TestLabel "test_parseLPat_GCon" test_parseLPat_GCon,
           TestLabel "test_parseAPat_Var" test_parseAPat_Var,
           TestLabel "test_parseAPat_head_tail" test_parseAPat_head_tail,
-          TestLabel "test_parseGCon_QCon" test_parseGCon_QCon
+          TestLabel "test_parseGCon_QCon" test_parseGCon_QCon,
+          TestLabel "test_parseVarOp" test_parseVarOp
         ]
     )

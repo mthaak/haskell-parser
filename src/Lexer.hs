@@ -15,12 +15,16 @@ import Data.Char
     isNumber,
     isUpper,
   )
+import Data.Either
+  ( rights,
+  )
 import Data.Maybe
   ( fromJust,
     isJust,
-    listToMaybe,
   )
+import Debug.Trace (traceShowId)
 import Tokens
+import Utils
 
 {- Wrap scanned tokens in ScanItem to add information about context -}
 data ScanItem a = ScanItem
@@ -61,28 +65,28 @@ instance Show a => Show (ScanItem a) where
         show tok
       ]
 
+data ScanError = ScanError
+  deriving (Eq, Show)
+
+-- Type of each scanner
+newtype Scanner = Scanner
+  { runScanner :: Input -> Either ScanError (Input, ScanItem Token)
+  }
+
 {- The scanner takes as an input a tuple of current scan location
    & the part of the string not yet scanned -}
 type Input = (Coordinates, String)
 
 -- Turns the input into a stream of scanned tokens
-lexer :: String -> [ScanItem Token]
+lexer :: String -> Either ScanError [ScanItem Token]
 lexer input = scan [] ((1, 1), input)
 
 -- Recursive scan until whole input has been consumed
-scan :: [ScanItem Token] -> Input -> [ScanItem Token]
-scan prevTokens ((r, c), remInput) =
-  if tok == EOF
-    then currTokens
-    else scan currTokens (nextCoords, nextInput)
-  where
-    (tok, str) = getNextToken remInput
-    currTokens = prevTokens ++ [ScanItem (r, c) str tok]
-    nextInput = drop (length str) remInput
-    nextCoords =
-      if tok == NewLine || tok == LineComment
-        then (r + 1, 1)
-        else (r, c + length str)
+scan :: [ScanItem Token] -> Input -> Either ScanError [ScanItem Token]
+scan prevItems input = case getNextToken input of
+  Left err -> Left err
+  Right ((_, []), _) -> Right prevItems
+  Right (remInput, newItem) -> scan (prevItems ++ [newItem]) remInput
 
 -- Matcher state
 data State
@@ -109,36 +113,24 @@ matchCharLiteral Middle _ _ = Just Middle
 matchCharLiteral _ _ _ = Nothing
 
 matchNumberLiteral :: State -> Char -> Int -> Maybe State
-matchNumberLiteral Start c 0 =
-  if isNumber c
-    then Just (End IntegerLiteral)
-    else Nothing
-matchNumberLiteral (End IntegerLiteral) c _ =
-  if isNumber c || c == '.'
-    then Just (End IntegerLiteral)
-    else Nothing
+matchNumberLiteral Start c 0
+  | isNumber c = Just (End IntegerLiteral)
+matchNumberLiteral (End IntegerLiteral) c _
+  | isNumber c || c == '.' = Just (End IntegerLiteral)
 matchNumberLiteral _ _ _ = Nothing
 
 matchTypeName :: State -> Char -> Int -> Maybe State
-matchTypeName Start c 0 =
-  if isAlpha c && isUpper c
-    then Just (End TypeName)
-    else Nothing
-matchTypeName (End TypeName) c _ =
-  if isAlphaNum c || isUnderscore c || isApostrophe c
-    then Just (End TypeName)
-    else Nothing
+matchTypeName Start c 0
+  | isAlpha c && isUpper c = Just (End TypeName)
+matchTypeName (End TypeName) c _
+  | isAlphaNum c || isUnderscore c || isApostrophe c = Just (End TypeName)
 matchTypeName _ _ _ = Nothing
 
 matchValName :: State -> Char -> Int -> Maybe State
-matchValName Start c 0 =
-  if (isAlpha c && isLower c) || isUnderscore c
-    then Just (End ValueName)
-    else Nothing
-matchValName (End ValueName) c _ =
-  if isAlphaNum c || isUnderscore c || isApostrophe c
-    then Just (End ValueName)
-    else Nothing
+matchValName Start c 0
+  | (isAlpha c && isLower c) || isUnderscore c = Just (End ValueName)
+matchValName (End ValueName) c _
+  | isAlphaNum c || isUnderscore c || isApostrophe c = Just (End ValueName)
 matchValName _ _ _ = Nothing
 
 matchLineComment :: State -> Char -> Int -> Maybe State
@@ -210,8 +202,8 @@ keywordMatchers = map (uncurry fn) keywords
         ("qualified", Tokens.Qualified)
       ]
 
-allMatchers :: [Matcher]
-allMatchers =
+matchers :: [Matcher]
+matchers =
   keywordMatchers
     -- Names
     ++ [ matchTypeName,
@@ -224,34 +216,33 @@ allMatchers =
          matchLineComment
        ]
     -- Symbols
-    ++ [ generateMatcher "=" Equals,
-         generateMatcher "->" SingleArrow,
-         generateMatcher "=>" DoubleArrow,
+    ++ [ generateMatcher "->" SingleArrow,
+         generateMatcher "=>" DoubleRightArrow,
          generateMatcher "<-" LeftArrow,
-         generateMatcher ":" Colon,
          generateMatcher "::" DoubleColon,
          generateMatcher ".." DoubleDot,
          generateMatcher " " Space,
          generateMatcher "\n" NewLine,
-         generateMatcher "!" Exclamation,
-         generateMatcher "#" Hash,
-         generateMatcher "$" Dollar,
-         generateMatcher "%" Percent,
-         generateMatcher "&" Ampersand,
-         generateMatcher "*" Asterisk,
-         generateMatcher "+" Plus,
+         --         generateMatcher "!" Exclamation,
+         --         generateMatcher "#" Hash,
+         --         generateMatcher "$" Dollar,
+         --         generateMatcher "%" Percent,
+         --         generateMatcher "&" Ampersand,
+         --         generateMatcher "*" Asterisk,
+         --         generateMatcher "+" Plus,
          generateMatcher "." Dot,
-         generateMatcher "/" Divide,
-         generateMatcher "<" LeftAngle,
+         --         generateMatcher "/" Divide,
+         --         generateMatcher "<" LeftAngle,
          generateMatcher "=" Equals,
-         generateMatcher ">" RightAngle,
-         generateMatcher "?" Question,
+         --         generateMatcher ">" RightAngle,
+         --         generateMatcher "?" Question,
          generateMatcher "@" At,
          generateMatcher "\\" Backslash,
-         generateMatcher "^" Caret,
+         --         generateMatcher "^" Caret,
          generateMatcher "|" Pipe,
-         generateMatcher "-" Dash,
+         --         generateMatcher "-" Dash,
          generateMatcher "~" Tilde,
+         generateMatcher ":" Colon,
          generateMatcher ";" SemiColon,
          generateMatcher "," Comma,
          generateMatcher "`" BackTick,
@@ -263,29 +254,85 @@ allMatchers =
          generateMatcher "}" RightBrace,
          generateMatcher "_" Underscore
        ]
-    ++ [matchOther] -- has to be last matcher, because it matches on everything
+
+simpleScanners :: [Scanner]
+simpleScanners = map simpleMatchScanner matchers
+
+applyMatcher :: Matcher -> State -> String -> Int -> Maybe (Token, Int)
+applyMatcher matcher prevState (c : cs) i
+  | isJust newState = applyMatcher matcher (fromJust newState) cs (i + 1)
+  | otherwise = fmap (,i) (getToken prevState)
+  where
+    newState = matcher prevState c i
+applyMatcher matcher prevState [] i = Just (EOF, i)
+
+simpleMatchScanner :: Matcher -> Scanner
+simpleMatchScanner m = Scanner fn
+  where
+    fn ((r, c), inputStr) = case applyMatcher m Start inputStr 0 of
+      Just (tok, n) ->
+        Right
+          ( (if tok == NewLine then (r + 1, 1) else (r, c + n), drop n inputStr),
+            ScanItem (r, c) (take n inputStr) tok
+          )
+      Nothing -> Left ScanError
+
+withCondition :: (String -> Bool) -> Scanner -> Scanner
+withCondition pred scanner = Scanner fn
+  where
+    fn input = case runScanner scanner input of
+      Left err -> Left err
+      Right (remInput, si) ->
+        if pred (scanStr si)
+          then Right (remInput, si)
+          else Left ScanError
+
+varsymScanner :: Scanner
+varsymScanner = withCondition (fnot (isReservedOp `fand` isDashes)) scanner
+  where
+    matcher :: Matcher
+    matcher Start c 0
+      | c /= ':' && isSymbol c = Just (End Varsym)
+    matcher (End Varsym) c _
+      | isSymbol c = Just (End Varsym)
+    matcher _ _ _ = Nothing
+    scanner = simpleMatchScanner matcher
+
+consymScanner :: Scanner
+consymScanner = withCondition isReservedOp scanner
+  where
+    matcher :: Matcher
+    matcher Start ':' 0 = Just (End Consym)
+    matcher (End Consym) c _
+      | isSymbol c = Just (End Consym)
+    matcher _ _ _ = Nothing
+    scanner = simpleMatchScanner matcher
+
+otherScanner :: Scanner
+otherScanner = simpleMatchScanner matchOther
+
+complexScanners :: [Scanner]
+complexScanners =
+  [ varsymScanner,
+    consymScanner
+  ]
+
+allScanners :: [Scanner]
+allScanners =
+  simpleScanners
+    ++ complexScanners
+    ++ [otherScanner] -- has to be last scanner, because it matches on everything
 
 -- Get next token from the input
-getNextToken :: String -> (Token, String)
-getNextToken input = findLongestMatch input 0 initMatchers (EOF, "")
-  where
-    initMatchers = map (Start,) allMatchers
+getNextToken :: Input -> Either ScanError (Input, ScanItem Token)
+getNextToken input = findLongestScan input allScanners
 
--- Keeps track of the input, the position in the input, the matcher states and the longest match until now
-findLongestMatch :: String -> Int -> [(State, Matcher)] -> (Token, String) -> (Token, String)
-findLongestMatch input idx prevMatchers prevLongestMatch
-  | idx >= length input = prevLongestMatch
-  | (not . null) currMatchers = findLongestMatch input (idx + 1) currMatchers currLongestMatch
-  --  | (not . null) currMatchers = traceShow (input, idx, map fst prevMatchers, prevLongestMatch) (findLongestMatch input (idx + 1) currMatchers currLongestMatch)
-  | otherwise = prevLongestMatch
+-- Apply a list of scanners to the input and return the longest scan result
+findLongestScan :: Input -> [Scanner] -> Either ScanError (Input, ScanItem Token)
+findLongestScan input scanners = maybe (Left ScanError) Right longestScan
   where
-    currMatchers = updateMatchers (input !! idx) idx prevMatchers
-    firstMatch = (listToMaybe . map fst . filter (\(s, m) -> isEnd s)) currMatchers
-    firstMatchToken = firstMatch >>= getToken
-    currLongestMatch =
-      if isJust firstMatchToken
-        then (fromJust firstMatchToken, take (idx + 1) input)
-        else prevLongestMatch
+    longestScan = maxBy (\(_, si) -> length (scanStr si)) (rights appliedScanners)
+    appliedScanners = map (`runScanner` input) scanners
 
 -- Returns the token if the matcher state is End, else Nothing
 getToken :: State -> Maybe Token

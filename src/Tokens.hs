@@ -3,6 +3,7 @@ module Tokens
     Token (..),
     isReservedOp,
     isDashes,
+    isSymbol
   )
 where
 
@@ -43,6 +44,8 @@ data Token
   | -- Names
     TypeName -- Type
   | ValueName -- val
+  | Varsym -- ++
+  | Consym -- :+
   | -- Literals
     IntegerLiteral -- 12
   | FloatLiteral -- 12.3
@@ -51,7 +54,7 @@ data Token
   | LineComment -- --abc
   | -- Symbols
     SingleArrow -- ->
-  | DoubleArrow -- =>
+  | DoubleRightArrow -- =>
   | LeftArrow -- <-
   | DoubleColon -- ::
   | DoubleDot -- ..
@@ -106,8 +109,38 @@ reservedOpList =
     "=>"
   ]
 
+ascSymbolList :: [Char]
+ascSymbolList =
+  [ '!',
+    '#',
+    '$',
+    '%',
+    '&',
+    '*',
+    '+',
+    '.',
+    '/',
+    '<',
+    '=',
+    '>',
+    '?',
+    '@',
+    '\\',
+    '^',
+    '|',
+    '-',
+    '~',
+    ':'
+  ]
+
 isReservedOp :: String -> Bool
 isReservedOp str = str `elem` reservedOpList
 
 isDashes :: String -> Bool
 isDashes str = length str >= 2 && all (== '-') str
+
+isAscSymbol :: Char -> Bool
+isAscSymbol str = str `elem` ascSymbolList
+
+isSymbol :: Char -> Bool
+isSymbol = isAscSymbol -- TODO add uniSymbol

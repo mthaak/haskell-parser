@@ -3,10 +3,7 @@ module Prescan where
 import Data.List (isPrefixOf, isSuffixOf)
 import Utils (sublist)
 
-data LanguagePragma = DuplicateRecordFields | EmptyDataDeriving | TupleSections
-  deriving (Eq, Show)
-
-data Pragma = Language LanguagePragma
+data Pragma = Language String
   deriving (Eq, Show)
 
 data PrescanError = PrescanError
@@ -42,8 +39,5 @@ parsePragma input
     Language <$> parseLanguagePragma (drop 9 input)
 parsePragma _ = Left PrescanError
 
-parseLanguagePragma :: String -> Either PrescanError LanguagePragma
-parseLanguagePragma "DuplicateRecordFields" = Right DuplicateRecordFields
-parseLanguagePragma "EmptyDataDeriving" = Right EmptyDataDeriving
-parseLanguagePragma "TupleSections" = Right TupleSections
-parseLanguagePragma _ = Left PrescanError
+parseLanguagePragma :: String -> Either PrescanError String
+parseLanguagePragma str = Right str

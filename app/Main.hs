@@ -1,15 +1,15 @@
 module Main where
 
-import Prescan (prescan)
 import Layout (convertLayout)
 import Lexer (ScanItem (..), lexer)
 import Parser (parse)
+import Prescan (prescan)
 import System.Environment
 import System.Exit
+import System.TimeIt (timeIt)
 import Text.Printf
 import Tokens (Token (Other))
 import Utils (prettyprint)
-import System.TimeIt (timeIt)
 
 main :: IO ()
 main = timeIt $ getArgs >>= parseArgs >>= run
@@ -35,19 +35,22 @@ run input = do
 
   -- Run lexical analysis
   let scanItems = lexer prescanned
-  putStrLn . printf "Number of non identified characters: %d" $
-    length (filter (\st -> scanTok st == Other) scanItems)
+
+  putStrLn $ either
+    (const "")
+    (\si -> printf "Number of non identified characters: %d" (length (filter (\st -> scanTok st == Other) si))) 
+    scanItems
 
   putStrLn ""
 
   -- Make layout-insensitive
-  let scanItems' = convertLayout scanItems
+  let scanItems' = fmap convertLayout scanItems
   putStrLn "Layout-insensitive lexical analysis:"
-  print scanItems'
+  print $ either (const "error") show scanItems'
 
   putStrLn ""
 
   -- Run parser
-  let parsed = parse scanItems'
+  let parsed = fmap parse scanItems'
   putStrLn "Parse result:"
   putStrLn . either show (prettyprint . show) $ parsed

@@ -69,12 +69,11 @@ type QTyCon = TyCon
 type QTyCls = TyCls
 
 -- Qualified variable symbol
--- TODO qvarsym	→	[ modid . ] varsym
-type QVarSym = VarSym
+data QVarSym = QVarSym (Maybe ModId) VarSym
+  deriving (Eq, Show)
 
 -- Qualified constructor symbol
--- TODO qconsym	→	[ modid . ] consym
-data QConSym = QConSym String
+data QConSym = QConSym (Maybe ModId) ConSym
   deriving (Eq, Show)
 
 -- Integer literal

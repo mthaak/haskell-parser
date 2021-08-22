@@ -88,10 +88,10 @@ parseItem expTok = Parser fn
     fn [] = Left $ ParseError (0, 0) "Could not find next scan item"
 
 parseToken :: Token -> Parser Token
-parseToken expTok = scanTok <$> parseItem expTok
+parseToken tok = scanTok <$> parseItem tok
 
 parseTokenAsString :: Token -> Parser String
-parseTokenAsString expTok = scanStr <$> parseItem expTok
+parseTokenAsString tok = scanStr <$> parseItem tok
 
 parseTokens :: [Token] -> Parser [Token]
 parseTokens = mapM parseToken

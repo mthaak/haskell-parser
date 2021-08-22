@@ -3,6 +3,9 @@ module Utils
     firstJust,
     prettyprint,
     sublist,
+    maxBy,
+    fand,
+    fnot,
   )
 where
 
@@ -43,3 +46,20 @@ sublist :: Int -> Int -> [a] -> [a]
 sublist a b xs = take n (drop a xs)
   where
     n = if b >= 0 then b - a else length xs + b - a
+
+
+maxBy :: (Ord b) => (a -> b) -> [a] -> Maybe a
+maxBy fab xs = fst <$> foldl g Nothing xs
+  where
+    g Nothing x = Just (x, fab x)
+    g (Just (xMax, max)) x =
+      let xVal = fab x
+       in if xVal > max
+            then Just (x, xVal)
+            else Just (xMax, max)
+
+fand :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
+fand f1 f2 = \x -> f1 x && f2 x
+
+fnot :: (a -> Bool) -> (a -> Bool)
+fnot f = \x -> not (f x)
