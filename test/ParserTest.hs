@@ -11,9 +11,9 @@ import Tokens
 -- TODO allow supplying tokens, and not also string and coordinates
 canParse :: Parser a -> Input -> Assertion
 canParse pa input = case runParser pa input of
-  Right (_, []) -> assertBool "" True
-  Right (_, _) -> assertBool "" False
-  Left _ -> assertBool "" False
+  Left err -> assertBool ("Parse failed: " ++ show err) False
+  Right (_, []) -> assertBool "Parse successful" True
+  Right (_, _) -> assertBool "Parse failed: input not fully consumed" False
 
 test_parseConSym :: Test
 test_parseConSym =

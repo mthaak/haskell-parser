@@ -1,63 +1,22 @@
 module Main where
 
-import Common (Error)
-import Layout (convertLayout)
-import Lexer (ScanItem (..), lexer)
-import Parser (ParseResult, parse)
-import Prescan (prescan)
+import Run (RunArgs (..), run)
 import System.Environment
 import System.Exit
 import System.TimeIt (timeIt)
-import Text.Printf
-import Tokens (Token (Other))
-import Utils (prettyprint)
 
-nop :: a -> IO ()
-nop _ = sequence_ []
-
-main :: IO ()
-main = timeIt $ getArgs >>= parseArgs >>= run >>= nop
+usage :: IO ()
+usage = putStrLn "Usage: haskell-parser [FILEPATH]"
 
 parseArgs :: [FilePath] -> IO [Char]
 parseArgs [] = usage >> exitSuccess
 parseArgs fs = concat `fmap` mapM readFile fs
 
-usage :: IO ()
-usage = putStrLn "Usage: haskell-parser [FILEPATH]"
+defaultRunArgs :: RunArgs
+defaultRunArgs = RunArgs True
 
-run :: String -> IO (Either Error ParseResult)
-run input = do
-  putStrLn "Running..."
+omitResult :: a -> IO ()
+omitResult _ = sequence_ []
 
-  putStrLn ""
-
-  -- Prescan
-  let (prescanned, pragmas) = prescan input
-  putStrLn . printf "Pragmas: %s" $ show pragmas
-
-  putStrLn ""
-
-  -- Run lexical analysis
-  let scanItems = lexer prescanned
-
-  putStrLn $
-    either
-      (const "")
-      (\si -> printf "Number of non identified characters: %d" (length (filter (\st -> scanTok st == Other) si)))
-      scanItems
-
-  putStrLn ""
-
-  -- Make layout-insensitive
-  let scanItems' = fmap convertLayout scanItems
-  putStrLn "Layout-insensitive lexical analysis:"
-  putStrLn $ either (const "error") show scanItems'
-
-  putStrLn ""
-
-  -- Run parser
-  let parsed = scanItems' >>= parse
-  putStrLn "Parse result:"
-  putStrLn . either show (prettyprint . show) $ parsed
-
-  pure parsed
+main :: IO ()
+main = timeIt $ getArgs >>= parseArgs >>= run defaultRunArgs >>= omitResult

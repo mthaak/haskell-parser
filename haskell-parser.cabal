@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bb73e1b83041a46d6c9ce970d1a6d9e68cad385900e9308a44d51d8147911284
+-- hash: 00c1391a6191d5f6b77a5c2426483290b8f2cbbe890fe7665f8550407ce0a1ca
 
 name:           haskell-parser
 version:        0.1.0
@@ -34,6 +34,7 @@ library
       Parser
       ParserHelpers
       Prescan
+      Run
       Tokens
       Utils
   other-modules:
@@ -69,6 +70,7 @@ test-suite haskell-parser-test
   main-is: Spec.hs
   other-modules:
       ParserTest
+      RunTest
       Paths_haskell_parser
   hs-source-dirs:
       test
