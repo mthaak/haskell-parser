@@ -7,7 +7,7 @@ module Lexer
   )
 where
 
-import Common (Coordinates)
+import Common (Coordinates, Error (..))
 import Data.Char
   ( isAlpha,
     isAlphaNum,
@@ -18,6 +18,7 @@ import Data.Char
 import Data.Either
   ( rights,
   )
+import Data.List (intercalate)
 import Data.Maybe
   ( fromJust,
     isJust,
@@ -65,28 +66,31 @@ instance Show a => Show (ScanItem a) where
         show tok
       ]
 
-data ScanError = ScanError
-  deriving (Eq, Show)
-
 -- Type of each scanner
 newtype Scanner = Scanner
-  { runScanner :: Input -> Either ScanError (Input, ScanItem Token)
+  { runScanner :: Input -> Either Error (Input, ScanItem Token)
   }
 
 {- The scanner takes as an input a tuple of current scan location
    & the part of the string not yet scanned -}
 type Input = (Coordinates, String)
 
+inputLocation :: Input -> Coordinates
+inputLocation (location, _) = location
+
 -- Turns the input into a stream of scanned tokens
-lexer :: String -> Either ScanError [ScanItem Token]
+lexer :: String -> Either Error [ScanItem Token]
 lexer input = scan [] ((1, 1), input)
 
 -- Recursive scan until whole input has been consumed
-scan :: [ScanItem Token] -> Input -> Either ScanError [ScanItem Token]
+scan :: [ScanItem Token] -> Input -> Either Error [ScanItem Token]
 scan prevItems input = case getNextToken input of
+  -- Scan error
   Left err -> Left err
-  Right ((_, []), _) -> Right prevItems
-  Right (remInput, newItem) -> scan (prevItems ++ [newItem]) remInput
+  -- Scan finished, return tokens
+  Right ((_, []), _) -> Right (reverse (si (0, 0) "" EOF : prevItems))
+  -- Scan continuing to next token
+  Right (remInput, newItem) -> scan (newItem : prevItems) remInput
 
 -- Matcher state
 data State
@@ -275,7 +279,7 @@ simpleMatchScanner m = Scanner fn
           ( (if tok == NewLine then (r + 1, 1) else (r, c + n), drop n inputStr),
             ScanItem (r, c) (take n inputStr) tok
           )
-      Nothing -> Left ScanError
+      Nothing -> Left (ScanError (r, c) "Nothing to scan")
 
 withCondition :: (String -> Bool) -> Scanner -> Scanner
 withCondition pred scanner = Scanner fn
@@ -285,7 +289,7 @@ withCondition pred scanner = Scanner fn
       Right (remInput, si) ->
         if pred (scanStr si)
           then Right (remInput, si)
-          else Left ScanError
+          else Left (ScanError (scanLoc si) "Condition failed")
 
 varsymScanner :: Scanner
 varsymScanner = withCondition (fnot (isReservedOp `fand` isDashes)) scanner
@@ -324,12 +328,12 @@ allScanners =
     ++ [otherScanner] -- has to be last scanner, because it matches on everything
 
 -- Get next token from the input
-getNextToken :: Input -> Either ScanError (Input, ScanItem Token)
+getNextToken :: Input -> Either Error (Input, ScanItem Token)
 getNextToken input = findLongestScan input allScanners
 
 -- Apply a list of scanners to the input and return the longest scan result
-findLongestScan :: Input -> [Scanner] -> Either ScanError (Input, ScanItem Token)
-findLongestScan input scanners = maybe (Left ScanError) Right longestScan
+findLongestScan :: Input -> [Scanner] -> Either Error (Input, ScanItem Token)
+findLongestScan input scanners = maybe (Left (ScanError (inputLocation input) "Nothing scanned")) Right longestScan
   where
     longestScan = maxBy (\(_, si) -> length (scanStr si)) (rights appliedScanners)
     appliedScanners = map (`runScanner` input) scanners
@@ -338,16 +342,3 @@ findLongestScan input scanners = maybe (Left ScanError) Right longestScan
 getToken :: State -> Maybe Token
 getToken (End t) = Just t
 getToken _ = Nothing
-
--- Returns whether the state is End
-isEnd :: State -> Bool
-isEnd (End _) = True
-isEnd _ = False
-
--- Updates matchers on next character. Then removes matchers without a (partial) match
-updateMatchers :: Char -> Int -> [(State, Matcher)] -> [(State, Matcher)]
-updateMatchers char idx = map getMatch . filter isMatch . map runMatcher
-  where
-    runMatcher (state, matcher) = (matcher state char idx, matcher)
-    isMatch (maybeState, matcher) = isJust maybeState
-    getMatch (maybeState, matcher) = (fromJust maybeState, matcher)

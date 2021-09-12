@@ -1,6 +1,6 @@
 module ParserHelpers where
 
-import Common (Coordinates)
+import Common (Coordinates, Error (..), errorLoc)
 import Control.Applicative
 import Control.Monad
 import Elements
@@ -10,7 +10,7 @@ import Tokens (KeywordToken (..), Token (..))
 
 type Input = [ScanItem Token]
 
-newtype Parser a = Parser {runParser :: Input -> Either ParseError (a, Input)}
+newtype Parser a = Parser {runParser :: Input -> Either Error (a, Input)}
 
 instance Functor Parser where
   fmap fab pa = Parser $ fmap fn . runParser pa
@@ -57,17 +57,9 @@ instance Alternative Parser where
   empty = failure
   (<|>) = option
 
-data ParseError = ParseError Coordinates String deriving (Eq, Show)
-
-errorLoc :: ParseError -> Coordinates
-errorLoc (ParseError c _) = c
-
-errorMsg :: ParseError -> String
-errorMsg (ParseError _ s) = s
-
 -- PARSERS HELPERS
 
-fail :: Either ParseError a
+fail :: Either Error a
 fail = Left $ ParseError (0, 0) "Fail"
 
 parseFail :: Parser a
@@ -84,7 +76,7 @@ parseItem expTok = Parser fn
   where
     fn (si : xs)
       | scanTok si == expTok = Right (si, xs)
-      | otherwise = Left $ ParseError (0, 0) (printf "Could not parse item %s as expected token %s" (show si) (show expTok))
+      | otherwise = Left $ ParseError (scanLoc si) (printf "Could not parse item %s as expected token %s" (show si) (show expTok))
     fn [] = Left $ ParseError (0, 0) "Could not find next scan item"
 
 parseToken :: Token -> Parser Token

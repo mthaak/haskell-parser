@@ -3,7 +3,8 @@ module Tokens
     Token (..),
     isReservedOp,
     isDashes,
-    isSymbol
+    isSymbol,
+    ascSymbolTokens
   )
 where
 
@@ -109,8 +110,8 @@ reservedOpList =
     "=>"
   ]
 
-ascSymbolList :: [Char]
-ascSymbolList =
+ascSymbolStrings :: [Char]
+ascSymbolStrings =
   [ '!',
     '#',
     '$',
@@ -133,6 +134,30 @@ ascSymbolList =
     ':'
   ]
 
+ascSymbolTokens :: [Token]
+ascSymbolTokens =
+  [ Exclamation,
+    Hash,
+    Dollar,
+    Percent,
+    Ampersand,
+    Asterisk,
+    Plus,
+    Dot,
+    Divide,
+    LeftAngle,
+    Equals,
+    RightAngle,
+    Question,
+    At,
+    Backslash,
+    Caret,
+    Pipe,
+    Dash,
+    Tilde,
+    Colon
+  ]
+
 isReservedOp :: String -> Bool
 isReservedOp str = str `elem` reservedOpList
 
@@ -140,7 +165,7 @@ isDashes :: String -> Bool
 isDashes str = length str >= 2 && all (== '-') str
 
 isAscSymbol :: Char -> Bool
-isAscSymbol str = str `elem` ascSymbolList
+isAscSymbol str = str `elem` ascSymbolStrings
 
 isSymbol :: Char -> Bool
 isSymbol = isAscSymbol -- TODO add uniSymbol

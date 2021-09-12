@@ -3,21 +3,13 @@ module Layout
   )
 where
 
-import Common (Coordinates)
+import Common (Coordinates, Error (..))
 import Data.Either (fromRight, isLeft, isRight, rights)
 import Data.List (find)
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust, isJust, isNothing)
 import Debug.Trace (traceShow, traceShowId)
 import Lexer (ScanItem (..))
 import Tokens
-
-adjustLayout :: [(Token, String)] -> [(Token, String)]
-adjustLayout = map m . filter f
-  where
-    f = isNotSpace
-    isNotSpace (t, s) = t /= Space
-    m = replaceNewLine
-    replaceNewLine (t, s) = if t == NewLine then (SemiColon, ";") else (t, s)
 
 convertLayout :: [ScanItem Token] -> [ScanItem Token]
 convertLayout input = lexemes
@@ -25,7 +17,7 @@ convertLayout input = lexemes
     tokensWithIndent = traceShowId $ addIndentIndicators input False
     tokensMappedWithL = traceShowId $ funL tokensWithIndent []
     tokensCleaned = traceShowId $ cleanLayout (fromRight [] tokensMappedWithL)
-    lexemes = traceShowId $ filterLexemes tokensCleaned
+    lexemes = filterLexemes tokensCleaned
 
 -- Remove indent indicators
 cleanLayout :: [Either IndentIndicator (ScanItem Token)] -> [ScanItem Token]
@@ -36,7 +28,7 @@ filterLexemes = filter isLexeme
   where
     isLexeme si = tokenIsLexeme (scanTok si)
 
--- TODO merge into scanner, use ScanItem { scanLoc :: Location , scanStr :: String , scanItem :: a }
+-- TODO merge into scanner, use ScanItem { scanLoc :: Coordinates , scanStr :: String , scanItem :: a }
 
 data IndentIndicator
   = Start Int -- start context {n}
@@ -53,17 +45,15 @@ addIndentIndicators :: [ScanItem Token] -> Bool -> [Either IndentIndicator (Scan
 -- or 0 if the end of file has been reached.
 addIndentIndicators (item : items) hasStart
   | scanTok item `elem` [Keyword Let, Keyword Where, Keyword Do, Keyword Of]
-      && nextLexemeExists
-      && isNotLeftBrace nextLexeme =
-    if isEOF nextLexeme
-      then Right item : [Left (Start 1)]
+      && (isEOF || isNotLeftBrace nextLexeme) =
+    if isEOF
+      then Right item : [Left (Start 0)]
       else Right item : Left (Start (getCol nextLexeme)) : addIndentIndicators items True
   where
     maybeNextLexeme = find (tokenIsLexeme . scanTok) items
-    nextLexemeExists = isJust maybeNextLexeme
+    isEOF = isNothing maybeNextLexeme
     nextLexeme = fromJust maybeNextLexeme
     isNotLeftBrace si = scanTok si /= LeftBrace
-    isEOF si = scanTok si == EOF
     getCol si = snd (scanLoc si)
 -- Where the start of a lexeme is preceded only by white space on the same line,
 -- this lexeme is preceded by < n > where n is the indentation of the lexeme,
@@ -84,8 +74,6 @@ addIndentIndicators [] _ = []
 -- TODO string literal spanning multiple lines
 -- TODO If the first lexeme of a module is not { or module, then it is preceded by {n} where n is the indentation of the lexeme.
 
-data LayoutError = LayoutError deriving (Eq, Show)
-
 -- Appends elem to list if is right, otherwise return left
 -- TODO use monad for this?
 (>:) :: b -> Either a [b] -> Either a [b]
@@ -96,7 +84,7 @@ data LayoutError = LayoutError deriving (Eq, Show)
 x :: Coordinates
 x = (0, 0)
 
-funL :: [Either IndentIndicator (ScanItem Token)] -> [Int] -> Either LayoutError [Either IndentIndicator (ScanItem Token)]
+funL :: [Either IndentIndicator (ScanItem Token)] -> [Int] -> Either Error [Either IndentIndicator (ScanItem Token)]
 -- L (< n >: ts) (m : ms) if m = n = ; : (L ts (m : ms))
 funL (Left (Indent n) : ts) (m : ms) | m == n = Right (ScanItem x ";" SemiColon) >: funL ts (m : ms)
 -- L (< n >: ts) (m : ms) if n < m = } : (L (< n >: ts) ms)
@@ -112,7 +100,7 @@ funL (Left (Start n) : ts) ms = Right (ScanItem x "{" LeftBrace) >: (Right (Scan
 -- L (} : ts) (0 : ms) = } : (L ts ms)
 funL (Right (ScanItem _ _ RightBrace) : ts) (0 : ms) = Right (ScanItem x "}" RightBrace) >: funL ts ms
 -- L (} : ts) ms = parse-error
-funL (Right (ScanItem _ _ RightBrace) : ts) ms = Left LayoutError
+funL (Right (ScanItem coo _ RightBrace) : ts) ms = Left (LayoutError coo "Layout error")
 -- L ({ : ts) ms = { : (L ts (0 : ms))
 funL (Right (ScanItem _ _ LeftBrace) : ts) ms = Right (ScanItem x "{" LeftBrace) >: funL ts (0 : ms)
 -- L (t : ts) (m : ms) if m ∕= 0 and parse-error(t) = } : (L (t : ts) ms)
@@ -120,7 +108,11 @@ funL (Right (ScanItem _ _ LeftBrace) : ts) ms = Right (ScanItem x "{" LeftBrace)
 -- Luckily the program still works when disabling it, but it's not clear in which cases it won't work
 --funL (t : ts) (m : ms) | m /= 0 && parseError = Right (ScanItem x "}" RightBrace) >: funL (t : ts) ms
 --  where
---    parseError = ??
+--    numCurrentOpenContexts = length (m : ms)
+--    futureTokens = map scanTok (rights ts)
+--    numFutureContextsWillOpen = length (filter (== LeftBrace) futureTokens)
+--    numFutureContextsWillClose = length (filter (== RightBrace) futureTokens)
+--    parseError = traceShow (numCurrentOpenContexts, numFutureContextsWillOpen, numFutureContextsWillClose) $ numCurrentOpenContexts > (numFutureContextsWillClose - numFutureContextsWillOpen)
 -- L (t : ts) ms = t : (L ts ms)
 funL (Right t : ts) ms = Right t >: funL ts ms
 -- L [] [] = []

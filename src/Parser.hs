@@ -1,9 +1,9 @@
 {-# LANGUAGE BlockArguments #-}
 
 module Parser
-  ( parse,
+  ( ParseResult,
+    parse,
     runParser,
-    ParseError,
     Parser,
     Input,
     parseConSym,
@@ -29,15 +29,18 @@ module Parser
   )
 where
 
+import Common (Error (..))
 import Control.Applicative
 import Data.List (intercalate, (\\))
 import Data.Maybe (fromMaybe, isJust)
 import Debug.Trace (traceM)
 import Elements
 import ParserHelpers
-import Tokens (KeywordToken (..), Token (..), isDashes, isReservedOp)
+import Tokens (KeywordToken (..), Token (..), ascSymbolTokens, isDashes, isReservedOp)
 
-parse :: Input -> Either ParseError Module
+type ParseResult = Module
+
+parse :: Input -> Either Error ParseResult
 parse input = do
   (elem_, rem_) <- runParser parseModule input
   traceM ("remainder: " ++ show rem_)
@@ -53,7 +56,7 @@ parseLiteral =
     <|> Literal_String <$> parseString
 
 parseVarSym :: Parser VarSym
-parseVarSym = VarSym <$> parseTokenAsString Tokens.Varsym
+parseVarSym = VarSym <$> oneOfTokensAsString (Tokens.Varsym : ascSymbolTokens)
 
 parseConSym :: Parser ConSym
 parseConSym = ConSym <$> parseTokenAsString Tokens.Consym
