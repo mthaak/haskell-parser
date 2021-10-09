@@ -50,23 +50,17 @@ type TyCls = ConId
 data ModId = ModId String
   deriving (Eq, Show)
 
--- TODO qualified elements
-
 -- Qualified variable ID
--- TODO qvarid	→	[ modid . ] varid
-type QVarId = VarId
+data QVarId = QVarId (Maybe ModId) VarId deriving (Eq, Show)
 
 -- Qualified module ID
--- TODO qconid	→	[ modid . ] conid
-type QConId = ConId
+data QConId = QConId (Maybe ModId) ConId deriving (Eq, Show)
 
 -- Qualified type constructor
--- TODO qtycon	→	[ modid . ] tycon
-type QTyCon = TyCon
+data QTyCon = QTyCon (Maybe ModId) TyCon deriving (Eq, Show)
 
 -- Qualified type class
--- TODO qtycls	→	[ modid . ] tycls
-type QTyCls = TyCls
+data QTyCls = QTyCls (Maybe ModId) TyCls deriving (Eq, Show)
 
 -- Qualified variable symbol
 data QVarSym = QVarSym (Maybe ModId) VarSym
@@ -214,7 +208,7 @@ data Context = Context [Class]
   deriving (Eq, Show) -- TODO
 
 -- Class
-data Class = Class TyCls TyVar
+data Class = Class QTyCls TyVar
   deriving (Eq, Show) -- TODO
 
 data SContext = SContext [SimpleClass]

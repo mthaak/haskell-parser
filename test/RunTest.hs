@@ -22,18 +22,19 @@ testCanRunOnFile filepath =
         canRunOn input
     )
 
--- TODO list files from directory
 sourceFiles :: [String]
 sourceFiles =
-  [ --  "src/Common.hs",
-    --    "src/Elements.hs",
-    --    "src/Layout.hs",
-    --    "src/Lexer.hs",
-    --    "src/Parser.hs",
-    --    "src/ParserHelpers.hs",
-    --    "src/Prescan.hs",
-    --    "src/Run.hs",
-    --    "src/Tokens.hs",
+  [ "src/Common.hs",
+    "src/Elements.hs",
+    "src/Layout.hs",
+    "src/Lexer.hs",
+    "src/Parser.hs",
+    "src/ParserHelpers.hs",
+    "src/Prescan.hs",
+    "src/Run.hs",
+    "src/Tokens.hs",
+    "test/ParserTest.hs",
+    "test/ParserTest.hs",
     "src/Utils.hs"
   ]
 

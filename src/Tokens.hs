@@ -32,10 +32,6 @@ data KeywordToken
   | Then -- then
   | Type -- type
   | Where -- where
-  -- Not in Lexical Syntax
-  | As -- as
-  | Hiding -- hiding
-  | Qualified -- qualified
   deriving (Eq, Ord, Show)
 
 -- TODO blockcomment

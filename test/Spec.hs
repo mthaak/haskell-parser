@@ -1,12 +1,12 @@
 import ParserTest
---import RunTest
+import RunTest
 import Test.HUnit
 
 tests :: Test
 tests =
   TestList
-    [ parserTests
-    --      runTests
+    [ parserTests,
+      runTests
     ]
 
 main :: IO Counts

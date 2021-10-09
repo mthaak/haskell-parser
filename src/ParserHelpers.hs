@@ -1,6 +1,6 @@
 module ParserHelpers where
 
-import Common (Coordinates, Error (..), errorLoc)
+import Common (Error (..), errorLoc)
 import Control.Applicative
 import Control.Monad
 import Elements
@@ -79,14 +79,25 @@ parseItem expTok = Parser fn
       | otherwise = Left $ ParseError (scanLoc si) (printf "Could not parse item %s as expected token %s" (show si) (show expTok))
     fn [] = Left $ ParseError (0, 0) "Could not find next scan item"
 
+parseItemWithString :: String -> Parser (ScanItem Token)
+parseItemWithString expStr = Parser fn
+  where
+    fn (si : xs)
+      | scanStr si == expStr = Right (si, xs)
+      | otherwise = Left $ ParseError (scanLoc si) (printf "Could not parse item %s as expected string %s" (show si) (show expStr))
+    fn [] = Left $ ParseError (0, 0) "Could not find next scan item"
+
 parseToken :: Token -> Parser Token
 parseToken tok = scanTok <$> parseItem tok
 
-parseTokenAsString :: Token -> Parser String
-parseTokenAsString tok = scanStr <$> parseItem tok
+parseTokenToString :: Token -> Parser String
+parseTokenToString tok = scanStr <$> parseItem tok
 
 parseTokens :: [Token] -> Parser [Token]
 parseTokens = mapM parseToken
+
+parseString :: String -> Parser String
+parseString str = scanStr <$> parseItemWithString str
 
 parseKeyword :: KeywordToken -> Parser KeywordToken
 parseKeyword keyword = parser >>= toKWParser
@@ -104,7 +115,7 @@ oneOfTokens :: [Token] -> Parser Token
 oneOfTokens tokens = foldl1 (<|>) (map parseToken tokens)
 
 oneOfTokensAsString :: [Token] -> Parser String
-oneOfTokensAsString tokens = foldl1 (<|>) (map parseTokenAsString tokens)
+oneOfTokensAsString tokens = foldl1 (<|>) (map parseTokenToString tokens)
 
 zeroOrMore :: Parser a -> Parser [a]
 zeroOrMore pa = Parser $ \s -> fn s []
@@ -189,6 +200,11 @@ precededBy pa t = do
 precededByOpt :: Parser a -> Token -> Parser a
 precededByOpt pa t = do
   optional $ parseToken t
+  pa
+
+precededByString :: Parser a -> String -> Parser a
+precededByString pa str = do
+  parseString str
   pa
 
 followedBy :: Parser a -> Token -> Parser a

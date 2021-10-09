@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 
+-- TODO clean up ordering of exports
 module Parser
   ( ParseResult,
     parse,
@@ -7,8 +8,13 @@ module Parser
     Parser,
     Input,
     parseConSym,
+    parseQTyCon,
     parseDecls,
     parseDecl,
+    parseConstrs,
+    parseConstr,
+    parseFieldDecl,
+    parseDeriving,
     parseFunLhs,
     parseRhs,
     parseVarSym,
@@ -18,10 +24,12 @@ module Parser
     parseExp,
     parseLExp,
     parseInfixExp,
+    parseAExp,
     parseTopDecl,
-    parseConstrs,
-    parseConstr,
-    parseDeriving,
+    parseIDecl,
+    parseStmts,
+    parseStmt,
+    parseFBind,
     parsePat,
     parseLPat,
     parseAPat,
@@ -33,9 +41,8 @@ where
 
 import Common (Error (..))
 import Control.Applicative
-import Data.List (intercalate, (\\))
+import Data.List (intercalate)
 import Data.Maybe (isJust)
-import Debug.Trace (traceM)
 import Elements
 import ParserHelpers
 import Tokens (KeywordToken (..), Token (..))
@@ -44,35 +51,51 @@ type ParseResult = Module
 
 parse :: Input -> Either Error ParseResult
 parse input = do
-  (elem_, rem_) <- runParser parseModule input
-  traceM ("remainder: " ++ show rem_)
-  pure elem_
+  (element, remainder) <- runParser parseModule input
+  pure element
 
 -- PARSE TERMINALS
 
 parseLiteral :: Parser Literal
 parseLiteral =
-  Literal_Int <$> parseInteger
-    <|> Literal_Float <$> parseFloat
-    <|> Literal_Char <$> parseChar
-    <|> Literal_String <$> parseString
+  Literal_Int <$> parseLitInteger
+    <|> Literal_Float <$> parseLitFloat
+    <|> Literal_Char <$> parseLitChar
+    <|> Literal_String <$> parseLitString
+
+parseQualifiedId :: Parser a -> (Maybe ModId -> a -> b) -> Parser b
+parseQualifiedId pa con = do
+  conIds <- zeroOrMoreSep Dot parseConId
+  let modIdStr = (intercalate "." . map (\(ConId str) -> str)) conIds
+  let maybeModId = if null modIdStr then Nothing else Just (ModId modIdStr)
+  id <- pa
+  pure $ con maybeModId id
+
+parseQualifiedConId :: (Maybe ModId -> ConId -> a) -> Parser a
+parseQualifiedConId con = do
+  conIds <- oneOrMoreSep Dot parseConId
+  let modIdStr = (intercalate "." . map (\(ConId str) -> str) . init) conIds
+  let maybeModId = if null modIdStr then Nothing else Just (ModId modIdStr)
+  let id = last conIds
+  pure $ con maybeModId id
 
 parseVarSym :: Parser VarSym
 parseVarSym =
   VarSym
     <$> oneOfTokensAsString
       [ Tokens.Varsym,
-        Tokens.Dot -- not part of VarSym because has special meaning
+        -- Not part of VarSym because has special meaning:
+        Tokens.Dot
       ]
 
 parseConSym :: Parser ConSym
-parseConSym = ConSym <$> parseTokenAsString Tokens.Consym
+parseConSym = ConSym <$> parseTokenToString Tokens.Consym
 
 parseVarId :: Parser VarId
-parseVarId = VarId <$> parseTokenAsString Tokens.ValueName
+parseVarId = VarId <$> parseTokenToString Tokens.ValueName
 
 parseConId :: Parser ConId
-parseConId = ConId <$> parseTokenAsString Tokens.TypeName
+parseConId = ConId <$> parseTokenToString Tokens.TypeName
 
 parseTyVar :: Parser TyVar
 parseTyVar = parseVarId
@@ -91,34 +114,35 @@ parseModId = do
   pure $ ModId modId
 
 parseQVarId :: Parser QVarId
-parseQVarId = parseVarId
+--parseQVarId = QVarId <$> optional (parseModId `followedBy` Dot) <*> parseVarId
+parseQVarId = parseQualifiedId parseVarId QVarId
 
 parseQConId :: Parser QConId
-parseQConId = parseConId
+parseQConId = parseQualifiedConId QConId
 
 parseQTyCon :: Parser QTyCon
-parseQTyCon = parseTyCon
+parseQTyCon = parseQualifiedConId QTyCon
 
 parseQTyCls :: Parser QTyCls
-parseQTyCls = parseTyCls
+parseQTyCls = parseQualifiedConId QTyCls
 
 parseQVarSym :: Parser QVarSym
-parseQVarSym = QVarSym <$> optional (parseModId `followedBy` Dot) <*> parseVarSym
+parseQVarSym = parseQualifiedId parseVarSym QVarSym
 
 parseQConSym :: Parser QConSym
-parseQConSym = QConSym <$> optional (parseModId `followedBy` Dot) <*> parseConSym
+parseQConSym = parseQualifiedId parseConSym QConSym
 
-parseInteger :: Parser LitInteger
-parseInteger = LitInteger <$> parseTokenAsString Tokens.IntegerLiteral
+parseLitInteger :: Parser LitInteger
+parseLitInteger = LitInteger <$> parseTokenToString Tokens.IntegerLiteral
 
-parseFloat :: Parser LitFloat
-parseFloat = LitFloat <$> parseTokenAsString Tokens.FloatLiteral
+parseLitFloat :: Parser LitFloat
+parseLitFloat = LitFloat <$> parseTokenToString Tokens.FloatLiteral
 
-parseChar :: Parser LitChar
-parseChar = LitChar <$> parseTokenAsString Tokens.CharLiteral
+parseLitChar :: Parser LitChar
+parseLitChar = LitChar <$> parseTokenToString Tokens.CharLiteral
 
-parseString :: Parser LitString
-parseString = LitString <$> parseTokenAsString Tokens.StringLiteral
+parseLitString :: Parser LitString
+parseLitString = LitString <$> parseTokenToString Tokens.StringLiteral
 
 -- NON-TERMINAL PARSERS
 
@@ -162,16 +186,16 @@ parseExport =
 parseImpDecl :: Parser ImpDecl
 parseImpDecl = do
   parseKeyword Tokens.Import
-  qualified <- isJust <$> optional (parseKeyword Qualified)
+  qualified <- isJust <$> optional (parseString "qualified")
   modId <- parseModId
-  modIdAs <- optional $ parseModId `precededBy` Keyword As
+  modIdAs <- optional $ parseModId `precededByString` "as"
   impSpec <- optional $ parseImpSpec
   pure $ ImpDecl qualified modId modIdAs impSpec
 
 parseImpSpec :: Parser ImpSpec
 parseImpSpec =
   ImpSpec <$> tupled' parseImport
-    <|> ImpSpec_Hiding <$> tupled' parseImport `precededBy` Keyword Hiding
+    <|> ImpSpec_Hiding <$> tupled' parseImport `precededByString` "hiding"
 
 parseImport :: Parser Import
 parseImport =
@@ -233,7 +257,7 @@ parseGenDecl =
   )
     <|> ( do
             fixity <- parseFixity
-            maybeInteger <- optional parseInteger
+            maybeInteger <- optional parseLitInteger
             ops <- parseOps
             pure $ GenDecl_Fixity fixity maybeInteger ops
         )
@@ -287,6 +311,8 @@ parseClass = do
   tyVar <- parseTyVar
   return (Elements.Class qTyCls tyVar)
 
+-- TODO
+
 parseSContext :: Parser SContext
 parseSContext =
   SContext <$> betweenParans (zeroOrMoreSep Tokens.Comma parseSimpleClass)
@@ -303,9 +329,10 @@ parseConstrs = oneOrMoreSep Pipe parseConstr
 
 parseConstr :: Parser Constr
 parseConstr =
-  Constr_ATypes <$> parseCon <*> zeroOrMore (parseAType `precededByOpt` Exclamation)
+  -- Different order than Haskell2010 syntax reference because of specificity of parsers
+  Constr_FieldDecls <$> parseCon <*> betweenBraces (zeroOrMoreSep Comma parseFieldDecl)
     -- TODO
-    <|> Constr_FieldDecls <$> parseCon <*> betweenBraces (zeroOrMoreSep Comma parseFieldDecl)
+    <|> Constr_ATypes <$> parseCon <*> zeroOrMore (parseAType `precededByOpt` Exclamation)
 
 parseNewConstr :: Parser NewConstr
 parseNewConstr =
@@ -415,17 +442,19 @@ parseFExp = do
 
 parseAExp :: Parser AExp
 parseAExp =
-  AExp_QVar <$> parseQVar
-    <|> AExp_GCon <$> parseGCon
-    <|> AExp_Lit <$> parseLiteral
-    <|> AExp_ParanExp <$> betweenParans parseExp
+  -- Different order than Haskell2010 syntax reference because of specificity of parsers
+  AExp_ParanExp <$> betweenParans parseExp
     <|> AExp_Tuple <$> tupled parseExp
     <|> AExp_List <$> listed parseExp
     <|> betweenBrackets (AExp_ArithSeq <$> parseExp <*> optional (parseExp `precededBy` Comma) <* parseToken DoubleDot <*> optional parseExp)
     <|> betweenBrackets (AExp_ListComp <$> parseExp <* parseToken Pipe <*> oneOrMoreSep Comma parseQual)
     <|> betweenParans (AExp_LeftSect <$> parseInfixExp <*> parseQOp)
     <|> betweenParans (AExp_RightSect <$> parseQOp <*> parseInfixExp) -- TODO ignore ⟨-⟩
-    <|> AExp_LabelCon <$> parseQCon <*> zeroOrMore parseFBind
+    <|> AExp_LabelCon <$> parseQCon <*> betweenBraces (zeroOrMoreSep Comma parseFBind)
+    -- TODO labeled update
+    <|> AExp_QVar <$> parseQVar
+    <|> AExp_GCon <$> parseGCon
+    <|> AExp_Lit <$> parseLiteral
 
 parseQual :: Parser Qual
 parseQual =
@@ -464,11 +493,7 @@ parseStmt =
     <|> Stmt_Empty <$ parseToken SemiColon
 
 parseFBind :: Parser FBind
-parseFBind = do
-  qVar <- parseQVar
-  parseToken Tokens.Equals
-  exp <- parseExp
-  return (FBind qVar exp)
+parseFBind = FBind <$> parseQVar <* parseToken Tokens.Equals <*> parseExp
 
 parsePat :: Parser Pat
 parsePat =
@@ -476,10 +501,10 @@ parsePat =
     <|> Pat_LPat <$> parseLPat
 
 parseLPat :: Parser LPat
--- order changed to parse smallest possibility last
 parseLPat =
+  -- Different order than Haskell2010 syntax reference because of specificity of parsers
   LPat_GCon <$> parseGCon <*> oneOrMore parseAPat
-    <|> LPat_NegLit <$> ParserHelpers.either parseInteger parseFloat `precededBy` Dash
+    <|> LPat_NegLit <$> ParserHelpers.either parseLitInteger parseLitFloat `precededBy` Dash
     <|> LPat_APat <$> parseAPat
 
 parseAPat :: Parser APat

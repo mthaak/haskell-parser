@@ -7,17 +7,16 @@ import Common (Coordinates, Error (..))
 import Data.Either (fromRight, rights)
 import Data.List (find)
 import Data.Maybe (fromJust, isJust, isNothing)
-import Debug.Trace (traceShowId)
 import Lexer (ScanItem (..))
 import Tokens
 
 convertLayout :: [ScanItem Token] -> [ScanItem Token]
 convertLayout input = tokensCleaned
   where
-    tokensWithIndent = traceShowId $ addIndentIndicators input False
-    lexemes = traceShowId $ filterLexemes tokensWithIndent
-    tokensMappedWithL = traceShowId $ funL lexemes []
-    tokensCleaned = traceShowId $ cleanLayout (fromRight [] tokensMappedWithL)
+    tokensWithIndent = addIndentIndicators input False
+    lexemes = filterLexemes tokensWithIndent
+    tokensMappedWithL = funL lexemes []
+    tokensCleaned = cleanLayout (fromRight [] tokensMappedWithL)
 
 -- Remove indent indicators
 cleanLayout :: [Either IndentIndicator (ScanItem Token)] -> [ScanItem Token]

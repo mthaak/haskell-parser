@@ -25,7 +25,7 @@ import Data.Maybe
 import Tokens
 import Utils
 
-{- Wrap scanned tokens in ScanItem to add information about context -}
+-- Wrap scanned tokens in ScanItem to add information about context
 data ScanItem a = ScanItem
   { scanLoc :: Coordinates,
     scanStr :: String,
@@ -69,8 +69,8 @@ newtype Scanner = Scanner
   { runScanner :: Input -> Either Error (Input, ScanItem Token)
   }
 
-{- The scanner takes as an input a tuple of current scan location
-   & the part of the string not yet scanned -}
+-- The scanner takes as an input a tuple of current scan location
+-- the part of the string not yet scanned
 type Input = (Coordinates, String)
 
 inputLocation :: Input -> Coordinates
@@ -104,13 +104,17 @@ type Matcher = State -> Char -> Int -> Maybe State
 -- TODO handle escaping
 matchStringLiteral :: State -> Char -> Int -> Maybe State
 matchStringLiteral Start '"' 0 = Just Middle
+matchStringLiteral Middle '\\' _ = Just Escape
+matchStringLiteral Escape _ _ = Just Middle
 matchStringLiteral Middle '"' _ = Just (End StringLiteral)
 matchStringLiteral Middle _ _ = Just Middle
 matchStringLiteral _ _ _ = Nothing
 
 matchCharLiteral :: State -> Char -> Int -> Maybe State
 matchCharLiteral Start '\'' 0 = Just Middle
-matchCharLiteral Middle '\'' _ = Just (End StringLiteral)
+matchCharLiteral Middle '\\' _ = Just Escape
+matchCharLiteral Escape _ _ = Just Middle
+matchCharLiteral Middle '\'' _ = Just (End CharLiteral)
 matchCharLiteral Middle _ _ = Just Middle
 matchCharLiteral _ _ _ = Nothing
 
@@ -197,11 +201,7 @@ keywordMatchers = map (uncurry fn) keywords
         ("of", Tokens.Of),
         ("then", Tokens.Then),
         ("type", Tokens.Type),
-        ("where", Tokens.Where),
-        -- Not in Lexical Syntax
-        ("as", Tokens.As),
-        ("hiding", Tokens.Hiding),
-        ("qualified", Tokens.Qualified)
+        ("where", Tokens.Where)
       ]
 
 matchers :: [Matcher]
@@ -263,7 +263,7 @@ simpleScanners = map simpleMatchScanner matchers
 applyMatcher :: Matcher -> State -> String -> Int -> Maybe (Token, Int)
 applyMatcher matcher prevState (c : cs) i
   | isJust newState = applyMatcher matcher (fromJust newState) cs (i + 1)
-  | otherwise = fmap (,i) (getToken prevState)
+  | otherwise = fmap (\t -> (t, i)) (getToken prevState)
   where
     newState = matcher prevState c i
 applyMatcher matcher prevState [] i = Just (EOF, i)
