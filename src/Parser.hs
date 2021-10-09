@@ -14,6 +14,7 @@ module Parser
     parseVarSym,
     parseGdRhs,
     parseGuards,
+    parseGuard,
     parseExp,
     parseLExp,
     parseInfixExp,
@@ -26,17 +27,18 @@ module Parser
     parseAPat,
     parseGCon,
     parseVarOp,
+    parseQOp,
   )
 where
 
 import Common (Error (..))
 import Control.Applicative
 import Data.List (intercalate, (\\))
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (isJust)
 import Debug.Trace (traceM)
 import Elements
 import ParserHelpers
-import Tokens (KeywordToken (..), Token (..), ascSymbolTokens, isDashes, isReservedOp)
+import Tokens (KeywordToken (..), Token (..))
 
 type ParseResult = Module
 
@@ -56,7 +58,12 @@ parseLiteral =
     <|> Literal_String <$> parseString
 
 parseVarSym :: Parser VarSym
-parseVarSym = VarSym <$> oneOfTokensAsString (Tokens.Varsym : ascSymbolTokens)
+parseVarSym =
+  VarSym
+    <$> oneOfTokensAsString
+      [ Tokens.Varsym,
+        Tokens.Dot -- not part of VarSym because has special meaning
+      ]
 
 parseConSym :: Parser ConSym
 parseConSym = ConSym <$> parseTokenAsString Tokens.Consym
@@ -414,9 +421,17 @@ parseAExp =
     <|> AExp_ParanExp <$> betweenParans parseExp
     <|> AExp_Tuple <$> tupled parseExp
     <|> AExp_List <$> listed parseExp
+    <|> betweenBrackets (AExp_ArithSeq <$> parseExp <*> optional (parseExp `precededBy` Comma) <* parseToken DoubleDot <*> optional parseExp)
+    <|> betweenBrackets (AExp_ListComp <$> parseExp <* parseToken Pipe <*> oneOrMoreSep Comma parseQual)
     <|> betweenParans (AExp_LeftSect <$> parseInfixExp <*> parseQOp)
     <|> betweenParans (AExp_RightSect <$> parseQOp <*> parseInfixExp) -- TODO ignore ⟨-⟩
     <|> AExp_LabelCon <$> parseQCon <*> zeroOrMore parseFBind
+
+parseQual :: Parser Qual
+parseQual =
+  Qual_Gen <$> parsePat <*> (parseExp `precededBy` LeftArrow)
+    <|> Qual_Local <$> (parseDecls `precededBy` Keyword Let)
+    <|> Qual_Guard <$> parseExp
 
 parseAlts :: Parser Alts
 parseAlts = oneOrMoreSep SemiColon parseAlt

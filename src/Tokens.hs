@@ -4,7 +4,7 @@ module Tokens
     isReservedOp,
     isDashes,
     isSymbol,
-    ascSymbolTokens
+    ascSymbolTokens,
   )
 where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module RunTest where
 
 import Run (RunArgs (..), run)
@@ -10,8 +8,9 @@ testRunArgs :: RunArgs
 testRunArgs = RunArgs False
 
 canRunOn :: String -> Assertion
-canRunOn input =
-  run testRunArgs input >>= \case
+canRunOn input = do
+  output <- run testRunArgs input
+  case output of
     Left err -> assertBool ("Run failed: " ++ show err) False
     Right _ -> assertBool "Run successful" True
 
@@ -26,16 +25,15 @@ testCanRunOnFile filepath =
 -- TODO list files from directory
 sourceFiles :: [String]
 sourceFiles =
-  [
---  "src/Common.hs",
---    "src/Elements.hs",
---    "src/Layout.hs",
---    "src/Lexer.hs",
---    "src/Parser.hs",
---    "src/ParserHelpers.hs",
---    "src/Prescan.hs",
---    "src/Run.hs",
---    "src/Tokens.hs",
+  [ --  "src/Common.hs",
+    --    "src/Elements.hs",
+    --    "src/Layout.hs",
+    --    "src/Lexer.hs",
+    --    "src/Parser.hs",
+    --    "src/ParserHelpers.hs",
+    --    "src/Prescan.hs",
+    --    "src/Run.hs",
+    --    "src/Tokens.hs",
     "src/Utils.hs"
   ]
 

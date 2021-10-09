@@ -4,6 +4,7 @@ module Utils
     prettyprint,
     sublist,
     maxBy,
+    for,
     fand,
     fnot,
   )
@@ -47,7 +48,6 @@ sublist a b xs = take n (drop a xs)
   where
     n = if b >= 0 then b - a else length xs + b - a
 
-
 maxBy :: (Ord b) => (a -> b) -> [a] -> Maybe a
 maxBy fab xs = fst <$> foldl g Nothing xs
   where
@@ -57,6 +57,9 @@ maxBy fab xs = fst <$> foldl g Nothing xs
        in if xVal > max
             then Just (x, xVal)
             else Just (xMax, max)
+
+for :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
+for f1 f2 = \x -> f1 x || f2 x
 
 fand :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
 fand f1 f2 = \x -> f1 x && f2 x

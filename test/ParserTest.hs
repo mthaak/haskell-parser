@@ -11,9 +11,15 @@ import Tokens
 -- TODO allow supplying tokens, and not also string and coordinates
 canParse :: Parser a -> Input -> Assertion
 canParse pa input = case runParser pa input of
-  Left err -> assertBool ("Parse failed: " ++ show err) False
-  Right (_, []) -> assertBool "Parse successful" True
+  Left err -> assertBool ("Parse unexpectedly failed: " ++ show err) False
+  Right (_, []) -> assertBool "Parse expectedly successful" True
   Right (_, _) -> assertBool "Parse failed: input not fully consumed" False
+
+cannotParse :: Parser a -> Input -> Assertion
+cannotParse pa input = case runParser pa input of
+  Left err -> assertBool ("Parse expectedly failed: " ++ show err) True
+  Right (_, []) -> assertBool "Parse unexpectedly successful" False
+  Right (_, _) -> assertBool "Parse failed: input not fully consumed" True
 
 test_parseConSym :: Test
 test_parseConSym =
@@ -85,6 +91,22 @@ test_parseGuards =
     ( canParse
         parseGuards
         [si (21, 3) "|" Pipe, si (21, 5) "scanTok" ValueName]
+    )
+
+test_parseGuard :: Test
+test_parseGuard =
+  TestCase
+    ( canParse
+        parseGuard
+        [si (21, 5) "scanTok" ValueName, si (21, 14) "==" Varsym, si (21, 16) "1" IntegerLiteral]
+    )
+
+test_parseGuard_fail_reservedOp :: Test
+test_parseGuard_fail_reservedOp =
+  TestCase
+    ( cannotParse
+        parseGuard
+        [si (21, 5) "scanTok" ValueName, si (21, 14) "=" Equals, si (21, 16) "1" IntegerLiteral]
     )
 
 test_parseExp_Literal :: Test
@@ -188,7 +210,7 @@ test_parseLPat_GCon =
   TestCase
     ( canParse
         parseLPat
-        [si (72,23) "Si" TypeName, si (72,26) "a" ValueName]
+        [si (72, 23) "Si" TypeName, si (72, 26) "a" ValueName]
     )
 
 test_parseAPat_Var :: Test
@@ -206,14 +228,13 @@ test_parseAPat_head_tail =
         parseAPat
         [si (19, 11) "(" LeftParan, si (19, 12) "x" ValueName, si (19, 14) ":" Colon, si (19, 16) "xs" ValueName, si (19, 18) ")" RightParan]
     )
-    
 
 test_parseGCon_QCon :: Test
 test_parseGCon_QCon =
   TestCase
     ( canParse
         parseGCon
-        [si (72,23) "Si" TypeName]
+        [si (72, 23) "Si" TypeName]
     )
 
 test_parseVarOp :: Test
@@ -221,7 +242,23 @@ test_parseVarOp =
   TestCase
     ( canParse
         parseVarOp
-        [si (0,0) "++" Varsym]
+        [si (0, 0) "++" Varsym]
+    )
+
+test_parseQOp :: Test
+test_parseQOp =
+  TestCase
+    ( canParse
+        parseQOp
+        [si (0, 0) "==" Varsym]
+    )
+
+test_parseQOp_fail_reservedOp :: Test
+test_parseQOp_fail_reservedOp =
+  TestCase
+    ( cannotParse
+        parseQOp
+        [si (0, 0) "=" Equals]
     )
 
 parserTests :: Test
@@ -229,8 +266,7 @@ parserTests =
   TestLabel
     "ParserTests"
     ( TestList
-        [
-          TestLabel "test_parseConSym" test_parseConSym,
+        [ TestLabel "test_parseConSym" test_parseConSym,
           TestLabel "test_parseDecls" test_parseDecls,
           TestLabel "test_parseDecl_GenDecl" test_parseDecl_GenDecl,
           TestLabel "test_parseDecl_Pat" test_parseDecl_Pat,
@@ -243,6 +279,8 @@ parserTests =
           TestLabel "test_parseLExp" test_parseLExp,
           TestLabel "test_parseGdRhs" test_parseGdRhs,
           TestLabel "test_parseGuards" test_parseGuards,
+          TestLabel "test_parseGuard" test_parseGuard,
+          TestLabel "test_parseGuard_fail_reservedOp" test_parseGuard_fail_reservedOp,
           TestLabel "test_parseExp_Literal" test_parseExp_Literal,
           TestLabel "test_parseExp_DoubleEquals" test_parseExp_DoubleEquals,
           TestLabel "test_parseInfixExp" test_parseInfixExp,
@@ -255,6 +293,8 @@ parserTests =
           TestLabel "test_parseAPat_Var" test_parseAPat_Var,
           TestLabel "test_parseAPat_head_tail" test_parseAPat_head_tail,
           TestLabel "test_parseGCon_QCon" test_parseGCon_QCon,
-          TestLabel "test_parseVarOp" test_parseVarOp
+          TestLabel "test_parseVarOp" test_parseVarOp,
+          TestLabel "test_parseQOp" test_parseQOp,
+          TestLabel "test_parseQOp_fail_reservedOp" test_parseQOp_fail_reservedOp
         ]
     )

@@ -18,12 +18,10 @@ import Data.Char
 import Data.Either
   ( rights,
   )
-import Data.List (intercalate)
 import Data.Maybe
   ( fromJust,
     isJust,
   )
-import Debug.Trace (traceShowId)
 import Tokens
 import Utils
 
@@ -276,10 +274,13 @@ simpleMatchScanner m = Scanner fn
     fn ((r, c), inputStr) = case applyMatcher m Start inputStr 0 of
       Just (tok, n) ->
         Right
-          ( (if tok == NewLine then (r + 1, 1) else (r, c + n), drop n inputStr),
+          ( (if tokenStartsNewLine tok then (r + 1, 1) else (r, c + n), drop n inputStr),
             ScanItem (r, c) (take n inputStr) tok
           )
       Nothing -> Left (ScanError (r, c) "Nothing to scan")
+
+tokenStartsNewLine :: Token -> Bool
+tokenStartsNewLine tok = tok == NewLine || tok == LineComment
 
 withCondition :: (String -> Bool) -> Scanner -> Scanner
 withCondition pred scanner = Scanner fn
@@ -292,7 +293,7 @@ withCondition pred scanner = Scanner fn
           else Left (ScanError (scanLoc si) "Condition failed")
 
 varsymScanner :: Scanner
-varsymScanner = withCondition (fnot (isReservedOp `fand` isDashes)) scanner
+varsymScanner = withCondition (fnot (isReservedOp `for` isDashes)) scanner
   where
     matcher :: Matcher
     matcher Start c 0

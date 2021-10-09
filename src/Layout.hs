@@ -4,29 +4,29 @@ module Layout
 where
 
 import Common (Coordinates, Error (..))
-import Data.Either (fromRight, isLeft, isRight, rights)
+import Data.Either (fromRight, rights)
 import Data.List (find)
 import Data.Maybe (fromJust, isJust, isNothing)
-import Debug.Trace (traceShow, traceShowId)
+import Debug.Trace (traceShowId)
 import Lexer (ScanItem (..))
 import Tokens
 
 convertLayout :: [ScanItem Token] -> [ScanItem Token]
-convertLayout input = lexemes
+convertLayout input = tokensCleaned
   where
     tokensWithIndent = traceShowId $ addIndentIndicators input False
-    tokensMappedWithL = traceShowId $ funL tokensWithIndent []
+    lexemes = traceShowId $ filterLexemes tokensWithIndent
+    tokensMappedWithL = traceShowId $ funL lexemes []
     tokensCleaned = traceShowId $ cleanLayout (fromRight [] tokensMappedWithL)
-    lexemes = filterLexemes tokensCleaned
 
 -- Remove indent indicators
 cleanLayout :: [Either IndentIndicator (ScanItem Token)] -> [ScanItem Token]
 cleanLayout = rights
 
-filterLexemes :: [ScanItem Token] -> [ScanItem Token]
+filterLexemes :: [Either IndentIndicator (ScanItem Token)] -> [Either IndentIndicator (ScanItem Token)]
 filterLexemes = filter isLexeme
   where
-    isLexeme si = tokenIsLexeme (scanTok si)
+    isLexeme si = either (const True) (tokenIsLexeme . scanTok) si
 
 -- TODO merge into scanner, use ScanItem { scanLoc :: Coordinates , scanStr :: String , scanItem :: a }
 

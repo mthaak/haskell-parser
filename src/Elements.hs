@@ -272,7 +272,7 @@ data Rhs
 
 data GdRhs = GdRhs Guards Exp (Maybe GdRhs)
   deriving (Eq, Show)
-  
+
 type Guards = [Guard]
 
 data Guard
@@ -314,13 +314,18 @@ data AExp -- TODO
   | AExp_ParanExp Exp
   | AExp_Tuple [Exp]
   | AExp_List [Exp]
-  | -- TODO:
-    --  | AExp_ArithSeq [Exp]
-    --  | AExp_ListComp Exp [Qual]
-    AExp_LeftSect InfixExp QOp
+  | AExp_ArithSeq Exp (Maybe Exp) (Maybe Exp)
+  | AExp_ListComp Exp [Qual]
+  | AExp_LeftSect InfixExp QOp
   | AExp_RightSect QOp InfixExp
   | AExp_LabelCon QCon [FBind]
   --  | AExp_LabelUpd AExp [FBind] -- TODO
+  deriving (Eq, Show)
+
+data Qual
+  = Qual_Gen Pat Exp
+  | Qual_Local Decls
+  | Qual_Guard Exp
   deriving (Eq, Show)
 
 type Alts = [Alt]
@@ -382,22 +387,26 @@ data GCon
   deriving (Eq, Show)
 
 -- Variable
-data Var = Var_VarId VarId
+data Var
+  = Var_VarId VarId
   | Var_VarSym VarSym
   deriving (Eq, Show)
 
 -- Qualified variable
-data QVar = QVar_QVarId QVarId
+data QVar
+  = QVar_QVarId QVarId
   | QVar_QVarSym QVarSym
   deriving (Eq, Show)
 
 -- Constructor
-data Con = Con_ConId ConId
+data Con
+  = Con_ConId ConId
   | Con_ConSym ConSym
   deriving (Eq, Show)
 
 -- Qualified constructor
-data QCon = QCon_QCondId QConId
+data QCon
+  = QCon_QCondId QConId
   | QCon_QConSym QConSym
   deriving (Eq, Show)
 
