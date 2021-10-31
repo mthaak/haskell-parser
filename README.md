@@ -11,7 +11,7 @@ be bugs and suboptimal code. No guarantees of correctness are given.**
 ## How it works
 
 Overall, the concept of a parser is simple: it turns raw code into an abstract syntax tree. This syntax tree could be
-potentially optimised afterwards. These are often the first steps of an interpreter or compiler. The next step could be
+potentially optimized afterward. These are often the first steps of an interpreter or compiler. The next step could be
 executing the code or translating it to another programming language.
 
 My implementation of a parser consists of 4 steps.
@@ -22,7 +22,7 @@ This takes the raw Haskell code of a single module as input. Then it looks for p
 string. Each line containing a pragma is replaced by an empty line. The processed lines and the separate pragmas are
 returned.
 
-The pragmas are not utilized at the moment (though they could in a more advanced parser implementation). Only the
+The pragmas are not utilized at the moment (though they could be in a more advanced parser implementation). Only the
 prescanned code feeds into the next step.
 
 ### 2. Lexer
@@ -31,11 +31,11 @@ This takes the prescanned code as input and converts it to a list of tokens. A t
 the syntax. All the possible tokens are defined in `Tokens.hs`.
 
 The algorithm for the lexer is somewhat home-grown. It scans the input for the longest string that matches a token. Once
-it finds that longest substring, it pops it off together with a token and the string location. After that it looks for
+it finds that longest substring, it pops it off together with a token and the string location. After that, it looks for
 the next token.
 
 Scanning for the longest substring is not an uncommon idea. But the approach in which the strings are matched might be.
-For each token there is a state machine that keeps track of whether the scanned letters are allowed in the current
+For each token, there is a state machine that keeps track of whether the scanned letters are allowed in the current
 position for the token.
 
 ### 3. Layout
@@ -55,10 +55,12 @@ of parsing is [recursive descent](https://en.wikipedia.org/wiki/Recursive_descen
 
 ### In summary...
 
+![Parser](https://user-images.githubusercontent.com/6129322/139604971-a582b045-a0f4-4cc8-9b29-5dd9a0b6cf21.png)
+
 ### Example
 
-Now I provide the input, output and intermediate products for the parsing of a seemingly simple program. The program
-calculates the fibonacci sequence. It was taken from [here](https://wiki.haskell.org/The_Fibonacci_sequence).
+Now I provide the input, output, and intermediate products for the parsing of a seemingly simple program. The program
+calculates the Fibonacci sequence. It was taken from [here](https://wiki.haskell.org/The_Fibonacci_sequence).
 
 Input:
 
@@ -108,138 +110,138 @@ Layout-insensitive-tokens:
 Abstract syntax tree:
 
 ```haskell
-Module 
-  (ModId "Sample") Nothing 
-  (Body 
+Module
+  (ModId "Sample") Nothing
+  (Body
     [
     ]
     [
-      TopDecl_Decl 
-        (Decl_Pat 
-          (Pat_LPat 
-            (LPat_APat 
-              (APat_Var 
-                (Var_VarId 
-                  (VarId "fibs")) Nothing))) 
-          (Rhs_Exp 
-            (Exp_InfixExp 
-              (InfixExp_Infix 
-                (LExp_FExp 
-                  (FExp 
-                    (AExp_Lit 
-                      (Literal_Int 
-                        (LitInteger "0"))) 
+      TopDecl_Decl
+        (Decl_Pat
+          (Pat_LPat
+            (LPat_APat
+              (APat_Var
+                (Var_VarId
+                  (VarId "fibs")) Nothing)))
+          (Rhs_Exp
+            (Exp_InfixExp
+              (InfixExp_Infix
+                (LExp_FExp
+                  (FExp
+                    (AExp_Lit
+                      (Literal_Int
+                        (LitInteger "0")))
                     [
                     ]
-                  )) 
-                (QOp_QConOp 
-                  (QConOp_GConSym GConSym_Colon)) 
-                (InfixExp_Infix 
-                  (LExp_FExp 
-                    (FExp 
-                      (AExp_Lit 
-                        (Literal_Int 
-                          (LitInteger "1"))) 
+                  ))
+                (QOp_QConOp
+                  (QConOp_GConSym GConSym_Colon))
+                (InfixExp_Infix
+                  (LExp_FExp
+                    (FExp
+                      (AExp_Lit
+                        (Literal_Int
+                          (LitInteger "1")))
                       [
                       ]
-                    )) 
-                  (QOp_QConOp 
-                    (QConOp_GConSym GConSym_Colon)) 
-                  (InfixExp_LExp 
-                    (LExp_FExp 
-                      (FExp 
-                        (AExp_QVar 
-                          (QVar_QVarId 
-                            (QVarId Nothing 
-                              (VarId "next")))) 
+                    ))
+                  (QOp_QConOp
+                    (QConOp_GConSym GConSym_Colon))
+                  (InfixExp_LExp
+                    (LExp_FExp
+                      (FExp
+                        (AExp_QVar
+                          (QVar_QVarId
+                            (QVarId Nothing
+                              (VarId "next"))))
                         [
-                          AExp_QVar 
-                            (QVar_QVarId 
-                              (QVarId Nothing 
+                          AExp_QVar
+                            (QVar_QVarId
+                              (QVarId Nothing
                                 (VarId "fibs")))
                         ]
-                      )))))) 
-            (Just 
+                      ))))))
+            (Just
               [
-                Decl_FunLhs 
-                  (FunLhs_Var 
-                    (Var_VarId 
-                      (VarId "next")) 
+                Decl_FunLhs
+                  (FunLhs_Var
+                    (Var_VarId
+                      (VarId "next"))
                     [
-                      APat_Paran 
-                        (Pat_Infix 
-                          (LPat_APat 
-                            (APat_Var 
-                              (Var_VarId 
-                                (VarId "a")) Nothing)) 
-                          (QConOp_GConSym GConSym_Colon) 
-                          (Pat_LPat 
-                            (LPat_APat 
-                              (APat_Var 
-                                (Var_VarId 
-                                  (VarId "t")) 
-                                (Just 
-                                  (APat_Paran 
-                                    (Pat_Infix 
-                                      (LPat_APat 
-                                        (APat_Var 
-                                          (Var_VarId 
-                                            (VarId "b")) Nothing)) 
-                                      (QConOp_GConSym GConSym_Colon) 
-                                      (Pat_LPat 
-                                        (LPat_APat 
-                                          (APat_Var 
-                                            (Var_VarId 
+                      APat_Paran
+                        (Pat_Infix
+                          (LPat_APat
+                            (APat_Var
+                              (Var_VarId
+                                (VarId "a")) Nothing))
+                          (QConOp_GConSym GConSym_Colon)
+                          (Pat_LPat
+                            (LPat_APat
+                              (APat_Var
+                                (Var_VarId
+                                  (VarId "t"))
+                                (Just
+                                  (APat_Paran
+                                    (Pat_Infix
+                                      (LPat_APat
+                                        (APat_Var
+                                          (Var_VarId
+                                            (VarId "b")) Nothing))
+                                      (QConOp_GConSym GConSym_Colon)
+                                      (Pat_LPat
+                                        (LPat_APat
+                                          (APat_Var
+                                            (Var_VarId
                                               (VarId "_")) Nothing))))))))))
                     ]
-                  ) 
-                  (Rhs_Exp 
-                    (Exp_InfixExp 
-                      (InfixExp_Infix 
-                        (LExp_FExp 
-                          (FExp 
-                            (AExp_ParanExp 
-                              (Exp_InfixExp 
-                                (InfixExp_Infix 
-                                  (LExp_FExp 
-                                    (FExp 
-                                      (AExp_QVar 
-                                        (QVar_QVarId 
-                                          (QVarId Nothing 
-                                            (VarId "a")))) 
+                  )
+                  (Rhs_Exp
+                    (Exp_InfixExp
+                      (InfixExp_Infix
+                        (LExp_FExp
+                          (FExp
+                            (AExp_ParanExp
+                              (Exp_InfixExp
+                                (InfixExp_Infix
+                                  (LExp_FExp
+                                    (FExp
+                                      (AExp_QVar
+                                        (QVar_QVarId
+                                          (QVarId Nothing
+                                            (VarId "a"))))
                                       [
                                       ]
-                                    )) 
-                                  (QOp_QVarOp 
-                                    (QVarOp_QVarSym 
-                                      (QVarSym Nothing 
-                                        (VarSym "+")))) 
-                                  (InfixExp_LExp 
-                                    (LExp_FExp 
-                                      (FExp 
-                                        (AExp_QVar 
-                                          (QVar_QVarId 
-                                            (QVarId Nothing 
-                                              (VarId "b")))) 
+                                    ))
+                                  (QOp_QVarOp
+                                    (QVarOp_QVarSym
+                                      (QVarSym Nothing
+                                        (VarSym "+"))))
+                                  (InfixExp_LExp
+                                    (LExp_FExp
+                                      (FExp
+                                        (AExp_QVar
+                                          (QVar_QVarId
+                                            (QVarId Nothing
+                                              (VarId "b"))))
                                         [
                                         ]
-                                      )))))) 
+                                      ))))))
                             [
                             ]
-                          )) 
-                        (QOp_QConOp 
-                          (QConOp_GConSym GConSym_Colon)) 
-                        (InfixExp_LExp 
-                          (LExp_FExp 
-                            (FExp 
-                              (AExp_QVar 
-                                (QVar_QVarId 
-                                  (QVarId Nothing 
-                                    (VarId "next")))) 
+                          ))
+                        (QOp_QConOp
+                          (QConOp_GConSym GConSym_Colon))
+                        (InfixExp_LExp
+                          (LExp_FExp
+                            (FExp
+                              (AExp_QVar
+                                (QVar_QVarId
+                                  (QVarId Nothing
+                                    (VarId "next"))))
                               [
-                                AExp_QVar 
-                                  (QVar_QVarId 
-                                    (QVarId Nothing 
+                                AExp_QVar
+                                  (QVar_QVarId
+                                    (QVarId Nothing
                                       (VarId "t")))
                               ]
                             ))))) Nothing)
@@ -252,4 +254,3 @@ Module
 ## Credits
 
 Lots of inspiration was taken from https://github.com/jrauhamaa/hc.
-
