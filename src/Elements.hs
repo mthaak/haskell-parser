@@ -5,10 +5,6 @@ module Elements where
 
 import Tokens (Token)
 
--- MISC ELEMENTS
-data All = All -- (..)
-  deriving (Eq, Show)
-
 -- TERMINAL ELEMENTS
 
 data Literal
@@ -30,11 +26,11 @@ data ConId = ConId String
   deriving (Eq, Show)
 
 -- Variable symbol
-data VarSym = VarSym String -- TODO
+data VarSym = VarSym String
   deriving (Eq, Show)
 
 -- Constructor symbol
-data ConSym = ConSym String -- TODO
+data ConSym = ConSym String
   deriving (Eq, Show)
 
 -- Type variable
@@ -176,12 +172,12 @@ data Fixity
   = Fixity_Infixl
   | Fixity_Infixr
   | Fixity_Infix
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show)
 
 -- Function type
 -- TODO make recursive?
 data Type = Type [BType]
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show)
 
 -- Function application
 -- TODO make recursive?
@@ -202,17 +198,17 @@ data GTyCon
   | GTyCon_ListCon
   | GTyCon_FunCon
   | GTyCon_TupleCon
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show)
 
 data Context = Context [Class]
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show) -- TODO single class
 
 -- Class
 data Class = Class QTyCls TyVar
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show) -- TODO multiple atypes
 
 data SContext = SContext [SimpleClass]
-  deriving (Eq, Show) -- TODO
+  deriving (Eq, Show) -- TODO single simple class
 
 data SimpleClass
   = SimpleClass QTyCls TyVar
@@ -251,6 +247,22 @@ data Inst
   | Inst_TyVar2 TyVar TyVar
   deriving (Eq, Show)
 
+-- TODO FDecl
+
+-- TODO CallConv
+
+-- TODO Impent
+
+-- TODO Expent
+
+-- TODO Safety
+
+-- TODO FType
+
+-- TODO FTType
+
+-- TODO FAType
+
 -- Function left hand side
 data FunLhs
   = FunLhs_Var Var [APat]
@@ -276,12 +288,12 @@ data Guard
   deriving (Eq, Show)
 
 -- Expression
--- TODO exp	→	infixexp :: [context =>] type	    (expression type signature)
 data Exp
   = Exp_InfixExp InfixExp
+  -- TODO expression type signature
   deriving (Eq, Show)
 
-data InfixExp -- TODO
+data InfixExp
   = InfixExp_Infix LExp QOp InfixExp
   | InfixExp_Neg InfixExp
   | InfixExp_LExp LExp
@@ -301,7 +313,7 @@ data LExp
 data FExp = FExp AExp [AExp]
   deriving (Eq, Show)
 
-data AExp -- TODO
+data AExp
   = AExp_QVar QVar
   | AExp_GCon GCon
   | AExp_Lit Literal
@@ -313,7 +325,7 @@ data AExp -- TODO
   | AExp_LeftSect InfixExp QOp
   | AExp_RightSect QOp InfixExp
   | AExp_LabelCon QCon [FBind]
-  --  | AExp_LabelUpd AExp [FBind] -- TODO
+  --  | AExp_LabelUpd AExp [FBind] -- TODO labeled update
   deriving (Eq, Show)
 
 data Qual
@@ -443,6 +455,10 @@ data QOp
 data GConSym
   = GConSym_Colon
   | GConSym_QConSym QConSym
+  deriving (Eq, Show)
+
+-- MISC ELEMENTS
+data All = All -- (..)
   deriving (Eq, Show)
 
 data Nop = Nop

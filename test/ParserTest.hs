@@ -20,7 +20,13 @@ cannotParse pa input = case runParser pa input of
   Right (_, []) -> assertBool "Parse unexpectedly successful" False
   Right (_, _) -> assertBool "Parse failed: input not fully consumed" True
 
--- TODO clean up ordering of tests
+test_parseVarSym :: Test
+test_parseVarSym =
+  TestCase
+    ( canParse
+        parseVarSym
+        [si (0, 0) ">=>" Varsym]
+    )
 
 test_parseConSym :: Test
 test_parseConSym =
@@ -36,6 +42,22 @@ test_parseQTyCon =
     ( canParse
         parseQTyCon
         [si (36, 7) "Common" TypeName, si (36, 13) "." Dot, si (36, 14) "Coordinates" TypeName]
+    )
+
+test_parseTopDecl_Data :: Test
+test_parseTopDecl_Data =
+  TestCase
+    ( canParse
+        parseTopDecl
+        [si (0, 0) "data" (Keyword Data), si (0, 0) "KeywordToken" TypeName, si (0, 0) "=" Equals, si (0, 0) "Module" TypeName, si (0, 0) "|" Pipe, si (0, 0) "Where" TypeName, si (0, 0) "|" Pipe, si (0, 0) "Data" TypeName, si (0, 0) "deriving" (Keyword Tokens.Deriving), si (0, 0) "(" LeftParan, si (0, 0) "Eq" TypeName, si (0, 0) "," Comma, si (0, 0) "Ord" TypeName, si (0, 0) "," Comma, si (0, 0) "Show" TypeName, si (0, 0) ")" RightParan]
+    )
+
+test_parseTopDecl_Instance :: Test
+test_parseTopDecl_Instance =
+  TestCase
+    ( canParse
+        parseTopDecl
+        [si (3, 1) "instance" (Keyword Instance), si (3, 10) "Functor" TypeName, si (3, 18) "ScanItem" TypeName, si (3, 27) "where" (Keyword Where), si (0, 0) "{" LeftBrace, si (4, 3) "fmap" ValueName, si (4, 8) "fab" ValueName, si (4, 12) "sia" ValueName, si (4, 16) "=" Equals, si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace, si (0, 0) "}" RightBrace]
     )
 
 test_parseDecls :: Test
@@ -70,8 +92,16 @@ test_parseDecl_GenDecl =
         [si (0, 0) "add" ValueName, si (0, 0) "::" DoubleColon, si (0, 0) "Num" TypeName, si (0, 0) "a" ValueName, si (0, 0) "=>" DoubleRightArrow, si (0, 0) "a" ValueName, si (0, 0) "->" SingleArrow, si (0, 0) "a" ValueName]
     )
 
-test_ParseConstrs :: Test
-test_ParseConstrs =
+test_parseIDecl :: Test
+test_parseIDecl =
+  TestCase
+    ( canParse
+        parseIDecl
+        [si (4, 3) "fmap" ValueName, si (4, 8) "fab" ValueName, si (4, 12) "sia" ValueName, si (4, 16) "=" Equals, si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace]
+    )
+
+test_parseConstrs :: Test
+test_parseConstrs =
   TestCase
     ( canParse
         parseConstrs
@@ -110,30 +140,6 @@ test_parseDeriving =
         [si (0, 0) "deriving" (Keyword Tokens.Deriving), si (0, 0) "(" LeftParan, si (0, 0) "Eq" TypeName, si (0, 0) "," Comma, si (0, 0) "Ord" TypeName, si (0, 0) "," Comma, si (0, 0) "Show" TypeName, si (0, 0) ")" RightParan]
     )
 
-test_parseTopDecl_Data :: Test
-test_parseTopDecl_Data =
-  TestCase
-    ( canParse
-        parseTopDecl
-        [si (0, 0) "data" (Keyword Data), si (0, 0) "KeywordToken" TypeName, si (0, 0) "=" Equals, si (0, 0) "Module" TypeName, si (0, 0) "|" Pipe, si (0, 0) "Where" TypeName, si (0, 0) "|" Pipe, si (0, 0) "Data" TypeName, si (0, 0) "deriving" (Keyword Tokens.Deriving), si (0, 0) "(" LeftParan, si (0, 0) "Eq" TypeName, si (0, 0) "," Comma, si (0, 0) "Ord" TypeName, si (0, 0) "," Comma, si (0, 0) "Show" TypeName, si (0, 0) ")" RightParan]
-    )
-
-test_parseTopDecl_Instance :: Test
-test_parseTopDecl_Instance =
-  TestCase
-    ( canParse
-        parseTopDecl
-        [si (3, 1) "instance" (Keyword Instance), si (3, 10) "Functor" TypeName, si (3, 18) "ScanItem" TypeName, si (3, 27) "where" (Keyword Where), si (0, 0) "{" LeftBrace, si (4, 3) "fmap" ValueName, si (4, 8) "fab" ValueName, si (4, 12) "sia" ValueName, si (4, 16) "=" Equals, si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace, si (0, 0) "}" RightBrace]
-    )
-
-test_parseIDecl :: Test
-test_parseIDecl =
-  TestCase
-    ( canParse
-        parseIDecl
-        [si (4, 3) "fmap" ValueName, si (4, 8) "fab" ValueName, si (4, 12) "sia" ValueName, si (4, 16) "=" Equals, si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace]
-    )
-
 test_parseFunLhs_Var :: Test
 test_parseFunLhs_Var =
   TestCase
@@ -148,6 +154,22 @@ test_parseFunLhs_Pat =
     ( canParse
         parseFunLhs
         [si (0, 0) "add" ValueName, si (0, 0) "[" LeftBracket, si (0, 0) "]" RightBracket]
+    )
+
+test_parseRhs_Exp1 :: Test
+test_parseRhs_Exp1 =
+  TestCase
+    ( canParse
+        parseRhs
+        [si (0, 0) "=" Equals, si (0, 0) "3" IntegerLiteral]
+    )
+
+test_parseRhs_Exp2 :: Test
+test_parseRhs_Exp2 =
+  TestCase
+    ( canParse
+        parseRhs
+        [si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Varsym, si (0, 0) "3" IntegerLiteral]
     )
 
 test_parseGdRhs :: Test
@@ -174,8 +196,8 @@ test_parseGuard =
         [si (21, 5) "scanTok" ValueName, si (21, 14) "==" Varsym, si (21, 16) "1" IntegerLiteral]
     )
 
-test_parseGuard_fail_reservedOp :: Test
-test_parseGuard_fail_reservedOp =
+test_parseGuard_fail_ReservedOp :: Test
+test_parseGuard_fail_ReservedOp =
   TestCase
     ( cannotParse
         parseGuard
@@ -198,38 +220,6 @@ test_parseExp_DoubleEquals =
         [si (20, 47) "ab" ValueName, si (20, 50) "==" Varsym, si (20, 53) "2" IntegerLiteral]
     )
 
-test_parseRhs_Exp1 :: Test
-test_parseRhs_Exp1 =
-  TestCase
-    ( canParse
-        parseRhs
-        [si (0, 0) "=" Equals, si (0, 0) "3" IntegerLiteral]
-    )
-
-test_parseRhs_Exp2 :: Test
-test_parseRhs_Exp2 =
-  TestCase
-    ( canParse
-        parseRhs
-        [si (0, 0) "=" Equals, si (0, 0) "x" ValueName, si (0, 0) "+" Varsym, si (0, 0) "3" IntegerLiteral]
-    )
-
-test_parseAexp_LabelCon :: Test
-test_parseAexp_LabelCon =
-  TestCase
-    ( canParse
-        parseAExp
-        [si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace]
-    )
-
-test_parseVarSym :: Test
-test_parseVarSym =
-  TestCase
-    ( canParse
-        parseVarSym
-        [si (0, 0) ">=>" Varsym]
-    )
-
 test_parseLExp :: Test
 test_parseLExp =
   TestCase
@@ -244,6 +234,14 @@ test_parseInfixExp =
     ( canParse
         parseInfixExp
         [si (0, 0) "Just" TypeName, si (0, 0) "1" IntegerLiteral]
+    )
+
+test_parseAexp_LabelCon :: Test
+test_parseAexp_LabelCon =
+  TestCase
+    ( canParse
+        parseAExp
+        [si (5, 5) "ScanItem" TypeName, si (0, 0) "{" LeftBrace, si (6, 9) "scanLoc" ValueName, si (6, 17) "=" Equals, si (6, 19) "scanLoc" ValueName, si (6, 27) "sia" ValueName, si (6, 30) "," Comma, si (7, 9) "scanStr" ValueName, si (7, 17) "=" Equals, si (7, 19) "scanStr" ValueName, si (7, 27) "sia" ValueName, si (7, 30) "," Comma, si (8, 9) "scanTok" ValueName, si (8, 17) "=" Equals, si (8, 19) "fab" ValueName, si (8, 23) "$" Varsym, si (8, 25) "scanTok" ValueName, si (8, 33) "sia" ValueName, si (0, 0) "}" RightBrace]
     )
 
 test_parseStmts :: Test
@@ -347,34 +345,34 @@ parserTests =
   TestLabel
     "ParserTests"
     ( TestList
-        [ TestLabel "test_parseConSym" test_parseConSym,
+        [ TestLabel "test_parseVarSym" test_parseVarSym,
+          TestLabel "test_parseConSym" test_parseConSym,
           TestLabel "test_parseQTyCon" test_parseQTyCon,
+          TestLabel "test_parseTopDecl_Data" test_parseTopDecl_Data,
+          TestLabel "test_parseTopDecl_Instance" test_parseTopDecl_Instance,
           TestLabel "test_parseDecls" test_parseDecls,
           TestLabel "test_parseDecl_GenDecl" test_parseDecl_GenDecl,
           TestLabel "test_parseDecl_Pat" test_parseDecl_Pat,
           TestLabel "test_parseDecl_FunLhs" test_parseDecl_FunLhs,
-          TestLabel "test_parseFunLhs_Var" test_parseFunLhs_Var,
-          TestLabel "test_parseFunLhs_Pat" test_parseFunLhs_Pat,
-          TestLabel "test_parseRhs_Exp1" test_parseRhs_Exp1,
-          TestLabel "test_parseRhs_Exp2" test_parseRhs_Exp2,
-          TestLabel "test_parseVarSym" test_parseVarSym,
-          TestLabel "test_parseLExp" test_parseLExp,
-          TestLabel "test_parseGdRhs" test_parseGdRhs,
-          TestLabel "test_parseGuards" test_parseGuards,
-          TestLabel "test_parseGuard" test_parseGuard,
-          TestLabel "test_parseGuard_fail_reservedOp" test_parseGuard_fail_reservedOp,
-          TestLabel "test_parseExp_Literal" test_parseExp_Literal,
-          TestLabel "test_parseExp_DoubleEquals" test_parseExp_DoubleEquals,
-          TestLabel "test_parseInfixExp" test_parseInfixExp,
-          TestLabel "test_parseAexp_LabelCon" test_parseAexp_LabelCon,
-          TestLabel "test_parseTopDecl_Data" test_parseTopDecl_Data,
-          TestLabel "test_parseTopDecl_Instance" test_parseTopDecl_Instance,
           TestLabel "test_parseIDecl" test_parseIDecl,
-          TestLabel "test_ParseConstrs" test_ParseConstrs,
+          TestLabel "test_parseConstrs" test_parseConstrs,
           TestLabel "test_parseConstr_TypeName" test_parseConstr_TypeName,
           TestLabel "test_parseConstr_FieldDecls" test_parseConstr_FieldDecls,
           TestLabel "test_parseFieldDecl" test_parseFieldDecl,
           TestLabel "test_parseDeriving" test_parseDeriving,
+          TestLabel "test_parseFunLhs_Var" test_parseFunLhs_Var,
+          TestLabel "test_parseFunLhs_Pat" test_parseFunLhs_Pat,
+          TestLabel "test_parseRhs_Exp1" test_parseRhs_Exp1,
+          TestLabel "test_parseRhs_Exp2" test_parseRhs_Exp2,
+          TestLabel "test_parseGdRhs" test_parseGdRhs,
+          TestLabel "test_parseGuards" test_parseGuards,
+          TestLabel "test_parseGuard" test_parseGuard,
+          TestLabel "test_parseGuard_fail_ReservedOp" test_parseGuard_fail_ReservedOp,
+          TestLabel "test_parseExp_Literal" test_parseExp_Literal,
+          TestLabel "test_parseExp_DoubleEquals" test_parseExp_DoubleEquals,
+          TestLabel "test_parseLExp" test_parseLExp,
+          TestLabel "test_parseInfixExp" test_parseInfixExp,
+          TestLabel "test_parseAexp_LabelCon" test_parseAexp_LabelCon,
           TestLabel "test_parseStmts" test_parseStmts,
           TestLabel "test_parseStmt" test_parseStmt,
           TestLabel "test_parseFBind" test_parseFBind,

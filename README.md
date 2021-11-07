@@ -77,6 +77,8 @@ fibs = 0 : 1 : next fibs
 Prescanned code:
 
 ```haskell
+
+
 module Fibonacci where
 
 fibs = 0 : 1 : next fibs
@@ -97,7 +99,7 @@ Tokens:
 
 **3. Layout**
 
-Layout-insensitive-tokens:
+Layout-insensitive tokens:
 
 ```haskell
 [ScanItem (3,1) "module" Keyword Module,ScanItem (3,8) "Sample" TypeName,ScanItem (3,15) "where" Keyword Where,ScanItem (0,0) "{" LeftBrace,ScanItem (5,1) "fibs" ValueName,ScanItem (5,6) "=" Equals,ScanItem (5,8) "0" IntegerLiteral,ScanItem (5,10) ":" Colon,ScanItem (5,12) "1" IntegerLiteral,ScanItem (5,14) ":" Colon,ScanItem (5,16) "next" ValueName,ScanItem (5,21) "fibs" ValueName,ScanItem (6,3) "where" Keyword Where,ScanItem (0,0) "{" LeftBrace,ScanItem (7,5) "next" ValueName,ScanItem (7,10) "(" LeftParan,ScanItem (7,11) "a" ValueName,ScanItem (7,13) ":" Colon,ScanItem (7,15) "t" ValueName,ScanItem (7,16) "@" At,ScanItem (7,17) "(" LeftParan,ScanItem (7,18) "b" ValueName,ScanItem (7,19) ":" Colon,ScanItem (7,20) "_" ValueName,ScanItem (7,21) ")" RightParan,ScanItem (7,22) ")" RightParan,ScanItem (7,24) "=" Equals,ScanItem (7,26) "(" LeftParan,ScanItem (7,27) "a" ValueName,ScanItem (7,28) "+" Varsym,ScanItem (7,29) "b" ValueName,ScanItem (7,30) ")" RightParan,ScanItem (7,32) ":" Colon,ScanItem (7,34) "next" ValueName,ScanItem (7,39) "t" ValueName,ScanItem (0,0) "}" RightBrace,ScanItem (0,0) "}" RightBrace]

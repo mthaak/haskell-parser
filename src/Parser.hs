@@ -1,23 +1,24 @@
 {-# LANGUAGE BlockArguments #-}
 
--- TODO clean up ordering of exports
 module Parser
   ( ParseResult,
     parse,
     runParser,
     Parser,
     Input,
+    parseVarSym,
     parseConSym,
     parseQTyCon,
+    parseTopDecl,
     parseDecls,
     parseDecl,
+    parseIDecl,
     parseConstrs,
     parseConstr,
     parseFieldDecl,
     parseDeriving,
     parseFunLhs,
     parseRhs,
-    parseVarSym,
     parseGdRhs,
     parseGuards,
     parseGuard,
@@ -25,8 +26,6 @@ module Parser
     parseLExp,
     parseInfixExp,
     parseAExp,
-    parseTopDecl,
-    parseIDecl,
     parseStmts,
     parseStmt,
     parseFBind,
@@ -46,6 +45,8 @@ import Data.Maybe (isJust)
 import Elements
 import ParserHelpers
 import Tokens (KeywordToken (..), Token (..))
+
+-- TODO ParseItem monad?
 
 type ParseResult = Module
 
@@ -217,7 +218,7 @@ parseTopDecl =
     <|> Keyword Tokens.Class `precedes` (TopDecl_Class <$> optional (parseSContext `followedBy` DoubleRightArrow) <*> parseTyCls <*> parseTyVar <*> optional (parseCDecls `precededBy` Keyword Where))
     <|> Keyword Instance `precedes` (TopDecl_Instance <$> optional (parseSContext `followedBy` DoubleRightArrow) <*> parseQTyCls <*> parseInst <*> optional (parseIDecls `precededBy` Keyword Where))
     <|> Keyword Default `precedes` (TopDecl_Default <$> betweenBraces (zeroOrMoreSep Comma parseType))
-    --  | TopDecl_Foreign [FDecl] -- TODO
+    --  | TopDecl_Foreign [FDecl] -- TODO foreign
     <|> TopDecl_Decl <$> parseDecl
 
 parseDecls :: Parser Decls
@@ -311,8 +312,6 @@ parseClass = do
   tyVar <- parseTyVar
   return (Elements.Class qTyCls tyVar)
 
--- TODO
-
 parseSContext :: Parser SContext
 parseSContext =
   SContext <$> betweenParans (zeroOrMoreSep Tokens.Comma parseSimpleClass)
@@ -331,7 +330,7 @@ parseConstr :: Parser Constr
 parseConstr =
   -- Different order than Haskell2010 syntax reference because of specificity of parsers
   Constr_FieldDecls <$> parseCon <*> betweenBraces (zeroOrMoreSep Comma parseFieldDecl)
-    -- TODO
+    -- TODO infix conop
     <|> Constr_ATypes <$> parseCon <*> zeroOrMore (parseAType `precededByOpt` Exclamation)
 
 parseNewConstr :: Parser NewConstr
@@ -415,9 +414,10 @@ parseGuard =
     <|> Guard_Decls <$> parseDecls `precededBy` Keyword Let
     <|> Guard_Infix <$> parseInfixExp
 
--- TODO
 parseExp :: Parser Exp
 parseExp = Exp_InfixExp <$> parseInfixExp
+
+-- TODO expression type signature
 
 parseInfixExp :: Parser InfixExp
 parseInfixExp =

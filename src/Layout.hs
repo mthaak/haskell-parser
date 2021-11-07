@@ -27,8 +27,6 @@ filterLexemes = filter isLexeme
   where
     isLexeme si = either (const True) (tokenIsLexeme . scanTok) si
 
--- TODO merge into scanner, use ScanItem { scanLoc :: Coordinates , scanStr :: String , scanItem :: a }
-
 data IndentIndicator
   = Start Int -- start context {n}
   | Indent Int -- line indent < n >
@@ -71,7 +69,6 @@ addIndentIndicators ((ScanItem c s t) : items) hasStart = Right (ScanItem c s t)
 addIndentIndicators [] _ = []
 
 -- TODO string literal spanning multiple lines
--- TODO If the first lexeme of a module is not { or module, then it is preceded by {n} where n is the indentation of the lexeme.
 
 -- Appends elem to list if is right, otherwise return left
 -- TODO use monad for this?
